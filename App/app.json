@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "Chill",
+    "slug": "chill",
+    "version": "1.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/téléchargement (3).png",
+    "scheme": "chill",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/transparent.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.steppingstones.chill"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/téléchargement (3).png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.steppingstones.chill",
+      "permissions": []
+    },
+    "web": {
+      "favicon": "./assets/téléchargement (3).png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "react-native-video",
+      "expo-video",
+      "expo-image",
+      "expo-splash-screen",
+      "expo-status-bar"
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "72fa9601-c6d9-44ee-958a-69b24d79a508"
+      }
+    }
+  }
+}

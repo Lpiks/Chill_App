@@ -1,0 +1,12 @@
+{
+  "name": "lpiksflow-root",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "concurrently \"cd Server && npm run dev\" \"cd admin && npm run dev\"",
+    "dev-server": "cd Server && npm run dev",
+    "dev-admin": "cd admin && npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
