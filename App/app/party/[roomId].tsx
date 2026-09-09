@@ -18,12 +18,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-// import { mediaDevices, RTCView, MediaStream } from 'react-native-webrtc';
-// import Peer from 'peerjs';
-const mediaDevices = { getUserMedia: async (opts?: any) => ({ getTracks: () => [], getVideoTracks: () => [], getAudioTracks: () => [], toURL: () => '' }) };
-const RTCView = ({ style }: any) => <View style={style} />;
-type MediaStream = any;
-const Peer = class { on() {}; call() { return { on: () => {} } }; destroy() {} } as any;
+import { mediaDevices, RTCView, MediaStream } from 'react-native-webrtc';
+import Peer from 'peerjs';
 import io, { Socket } from 'socket.io-client';
 import Animated, { 
   useSharedValue, 

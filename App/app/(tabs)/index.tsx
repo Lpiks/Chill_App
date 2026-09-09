@@ -1,5 +1,6 @@
-import React from 'react';
-import { ScrollView, RefreshControl, StyleSheet, View, TouchableOpacity, Text, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { ScrollView, RefreshControl, StyleSheet, View, TouchableOpacity, Text, Alert } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { tmdbService } from '../../services/tmdb';
@@ -17,6 +18,19 @@ import { BlurView } from 'expo-blur';
 export default function HomeScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  const [loadStep, setLoadStep] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLoadStep(prev => prev >= 3 ? prev : prev + 1);
+    }, 800);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleSeeAll = () => {
+    Alert.alert('Bientôt disponible', 'Cette page sera bientôt ajoutée !');
+  };
 
   // Queries
   const { data: trending, isLoading: loadTrending, refetch: refetchTrending } = useQuery({
@@ -42,6 +56,7 @@ export default function HomeScreen() {
         type: m.mediaType
       }));
     },
+    enabled: loadStep >= 1,
   });
 
   const { data: series, isLoading: loadSeries } = useQuery({
@@ -54,26 +69,31 @@ export default function HomeScreen() {
         type: m.mediaType
       }));
     },
+    enabled: loadStep >= 1,
   });
 
   const { data: kdramas, isLoading: loadKdramas } = useQuery({
     queryKey: ['kdramas'],
     queryFn: () => tmdbService.getKDramas(), 
+    enabled: loadStep >= 3,
   });
 
   const { data: anime, isLoading: loadAnime } = useQuery({
     queryKey: ['anime'],
     queryFn: () => tmdbService.getAnime(),
+    enabled: loadStep >= 3,
   });
 
   const { data: action, isLoading: loadAction } = useQuery({
     queryKey: ['action'],
     queryFn: () => tmdbService.getActionMovies(),
+    enabled: loadStep >= 2,
   });
 
   const { data: comedies, isLoading: loadComedies } = useQuery({
     queryKey: ['comedies'],
     queryFn: () => tmdbService.getComedies(),
+    enabled: loadStep >= 2,
   });
 
   const COMPANIES = [
@@ -213,7 +233,7 @@ export default function HomeScreen() {
                         }
                       })}
                     >
-                      <Image source={{ uri: `https://image.tmdb.org/t/p/w500${item.posterPath}` }} style={styles.continuePoster} />
+                      <Image source={{ uri: `https://image.tmdb.org/t/p/w342${item.posterPath}` }} style={styles.continuePoster} contentFit="cover" transition={300} />
                       <View style={styles.continueOverlay}>
                         <Ionicons name="play-circle" size={40} color="white" style={styles.continuePlayBtn} />
                       </View>
@@ -247,58 +267,65 @@ export default function HomeScreen() {
                 style={styles.companyCard}
                 onPress={() => router.push(`/company/${comp.id}?name=${encodeURIComponent(comp.name)}&logo=${encodeURIComponent(comp.logo)}`)}
               >
-                <Image source={{ uri: comp.logo }} style={styles.companyLogo} resizeMode="contain" />
+                <Image source={{ uri: comp.logo }} style={styles.companyLogo} contentFit="contain" transition={300} />
               </TouchableOpacity>
             ))}
           </ScrollView>
 
           <MediaRow 
             title="Tendances" 
-            data={trending || []} 
+            data={trending ? trending.slice(0, 10) : []} 
             loading={loadTrending}
             onPressItem={handlePressMedia}
+            onSeeAll={handleSeeAll}
           />
 
           <MediaRow 
             title="Blockbusters d'Action" 
-            data={action || []} 
+            data={action ? action.slice(0, 10) : []} 
             loading={loadAction}
             onPressItem={handlePressMedia}
+            onSeeAll={handleSeeAll}
           />
 
           <MediaRow 
             title="Comédies à Mourir de Rire" 
-            data={comedies || []} 
+            data={comedies ? comedies.slice(0, 10) : []} 
             loading={loadComedies}
             onPressItem={handlePressMedia}
+            onSeeAll={handleSeeAll}
           />
 
           <MediaRow 
             title="Films Populaires" 
-            data={popular || []} 
+            data={popular ? popular.slice(0, 10) : []} 
             loading={loadPopular}
             onPressItem={handlePressMedia}
+            onSeeAll={handleSeeAll}
           />
 
           <MediaRow 
             title="Séries Populaires" 
-            data={series || []} 
+            data={series ? series.slice(0, 10) : []} 
             loading={loadSeries}
             onPressItem={handlePressMedia}
+            onSeeAll={handleSeeAll}
           />
 
           <MediaRow 
             title="K-Dramas" 
-            data={kdramas || []} 
+            data={kdramas ? kdramas.slice(0, 10) : []} 
             loading={loadKdramas}
             onPressItem={handlePressMedia}
+            onSeeAll={handleSeeAll}
           />
 
           <MediaRow 
             title="L'Univers Anime" 
-            data={anime || []} 
+            data={anime ? anime.slice(0, 10) : []} 
             loading={loadAnime}
             onPressItem={handlePressMedia}
+            onSeeAll={handleSeeAll}
           />
         </View>
       </ScrollView>

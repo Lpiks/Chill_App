@@ -4,7 +4,10 @@ const STREMIO_ADDONS = [
   'https://opensubtitles-v3.strem.io', // Primary (V3)
   'https://opensubtitles.strem.io',    // Fallback (V2)
   'https://podnapisi.strem.io',        // Podnapisi (European/Global)
-  'https://yifysubtitles.strem.io'     // YIFY (Mainly Movies)
+  'https://yifysubtitles.strem.io',    // YIFY (Mainly Movies)
+  'https://addic7ed-v2.strem.io',      // Addic7ed (Mainly TV Shows)
+  'https://subdl.strem.io',            // SubDL Stremio Proxy
+  'https://stremio-opensubtitles.com'  // OpenSubtitles Community Proxy
 ];
 
 export const subtitlesService = {

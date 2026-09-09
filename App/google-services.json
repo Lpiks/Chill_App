@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "385013324771",
+    "project_id": "chill-app-f4134",
+    "storage_bucket": "chill-app-f4134.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:385013324771:android:538406c3bf0fdd76a25ed6",
+        "android_client_info": {
+          "package_name": "com.steppingstones.chill"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDWjz45wHEdii1Q49edcGidBduyV0UmOco"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

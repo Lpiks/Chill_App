@@ -25,6 +25,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.steppingstones.chill",
+      "googleServicesFile": "./google-services.json",
       "permissions": []
     },
     "web": {
@@ -33,7 +34,6 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "react-native-video",
       "expo-video",
       "expo-image",
       "expo-splash-screen",

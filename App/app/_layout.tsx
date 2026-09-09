@@ -15,15 +15,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as NavigationBar from 'expo-navigation-bar';
 import api from '../services/api';
 
-// import * as Notifications from 'expo-notifications';
-const Notifications = {
-  setNotificationHandler: (arg: any) => {},
-  getPermissionsAsync: async () => ({ status: 'granted' }),
-  requestPermissionsAsync: async () => ({ status: 'granted' }),
-  getExpoPushTokenAsync: async () => ({ data: 'dummy-token' }),
-  setNotificationChannelAsync: async (channelId: string, options: any) => {},
-  AndroidImportance: { MAX: 1 }
-};
+import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { useFriendStore } from '../store/friendStore';
 import Animated, { FadeOut, FadeIn } from 'react-native-reanimated';
@@ -34,6 +26,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -123,7 +117,7 @@ export default function RootLayout() {
     if (isAuthenticated) {
       registerForPushNotificationsAsync()
         .then(token => {
-          // if (token) api.post('/auth/update-push-token', { token }).catch(() => {});
+          if (token) api.post('/auth/update-push-token', { token }).catch(() => {});
         })
         .catch(e => console.warn('Push registration failed:', e));
 
@@ -162,6 +156,9 @@ export default function RootLayout() {
           return;
         }
         token = (await Notifications.getExpoPushTokenAsync()).data;
+        console.log("=========================================");
+        console.log("🔑 EXPO PUSH TOKEN: ", token);
+        console.log("=========================================");
       }
 
       if (Platform.OS === 'android') {

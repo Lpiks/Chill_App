@@ -22,15 +22,7 @@ import { colors } from '../../constants/colors';
 import { Message, Conversation, User } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import { getSocket } from '../../services/socket';
-// import { Audio } from 'expo-av';
-const Audio: any = {
-  requestPermissionsAsync: async () => ({ status: 'granted' }),
-  setAudioModeAsync: async () => {},
-  Recording: {
-    createAsync: async () => ({ recording: { stopAndUnloadAsync: async () => {}, getURI: () => 'dummy_uri' } })
-  },
-  RecordingOptionsPresets: { HIGH_QUALITY: {} }
-};
+import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -50,14 +42,14 @@ export default function ChatScreen() {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  const flashListRef = useRef<FlashList<Message>>(null);
+  const flashListRef = useRef<any>(null);
 
   // Queries
   const { data: conversation } = useQuery({
     queryKey: ['conversation', conversationId],
     queryFn: async () => {
       const { data } = await api.get(`/conversations`);
-      return (data as Conversation[]).find(c => c.id === conversationId || c._id === conversationId);
+      return (data as Conversation[]).find(c => (c as any).id === conversationId || c._id === conversationId);
     },
   });
 
@@ -153,7 +145,7 @@ export default function ChatScreen() {
   const startTyping = () => {
     if (!isTyping) {
       setIsTyping(true);
-      getSocket().then(s => s.emit('typing', { conversationId, userId: currentUser?._id }));
+      getSocket().then(s => s.emit('typing', { conversationId, userId: (currentUser as any)?._id || currentUser?.id }));
     }
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(stopTyping, 3000);
@@ -201,12 +193,12 @@ export default function ChatScreen() {
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
-    const isMe = (item.senderId._id || item.senderId.id) === currentUser?.id;
+    const isMe = ((item.senderId as any)._id || (item.senderId as any).id || item.senderId) === currentUser?.id;
     
     return (
       <View style={[styles.messageRow, isMe ? styles.myMessageRow : styles.otherMessageRow]}>
         {!isMe && (
-          <Image source={{ uri: item.senderId.avatar }} style={styles.msgAvatar} />
+          <Image source={{ uri: (item.senderId as any).avatar }} style={styles.msgAvatar} />
         )}
         <View style={[styles.bubble, isMe ? styles.myBubble : styles.otherBubble]}>
           {item.type === 'text' && (
@@ -219,7 +211,7 @@ export default function ChatScreen() {
               <Text style={styles.duration}>0:10</Text>
             </TouchableOpacity>
           )}
-          {item.type === 'media' && item.tmdbData && (
+          {(item.type as any) === 'media' && item.tmdbData && (
             <TouchableOpacity 
               style={styles.mediaCard}
               onPress={() => router.push(`/${item.tmdbData?.mediaType}/${item.tmdbData?.tmdbId}`)}
@@ -248,9 +240,9 @@ export default function ChatScreen() {
     );
   };
 
-  const otherUser = conversation?.members?.find(m => {
+  const otherUser: any = conversation?.members?.find((m: any) => {
     const mId = (m.id || m._id || m).toString();
-    const cId = (currentUser?.id || currentUser?._id)?.toString();
+    const cId = (currentUser?.id || (currentUser as any)?._id)?.toString();
     return mId !== cId;
   });
   
@@ -291,7 +283,7 @@ export default function ChatScreen() {
           ref={flashListRef}
           data={messages}
           renderItem={renderMessage}
-          estimatedItemSize={80}
+          {...({ estimatedItemSize: 80 } as any)}
           inverted
           onEndReached={() => hasNextPage && fetchNextPage()}
           onEndReachedThreshold={0.5}
