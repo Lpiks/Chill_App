@@ -41,7 +41,8 @@ export default function HomeScreen() {
         ...m,
         tmdbId: m.tmdbId,
         type: m.mediaType,
-        year: m.year || ''
+        year: m.year || '',
+        rating: m.score || 0
       }));
     },
   });
@@ -53,7 +54,8 @@ export default function HomeScreen() {
       return data.map((m: any) => ({
         ...m,
         tmdbId: m.tmdbId,
-        type: m.mediaType
+        type: m.mediaType,
+        rating: m.score || 0
       }));
     },
     enabled: loadStep >= 1,
@@ -66,7 +68,8 @@ export default function HomeScreen() {
       return data.map((m: any) => ({
         ...m,
         tmdbId: m.tmdbId,
-        type: m.mediaType
+        type: m.mediaType,
+        rating: m.score || 0
       }));
     },
     enabled: loadStep >= 1,

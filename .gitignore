@@ -44,3 +44,7 @@ build/
 # OS Generated Files
 .DS_Store
 Thumbs.db
+
+# Firebase Credentials
+google-services.json
+*-firebase-adminsdk-*.json

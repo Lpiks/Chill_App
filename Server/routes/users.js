@@ -95,6 +95,7 @@ router.get('/search', auth, async (req, res) => {
     const users = await User.find({
       $and: [
         { _id: { $ne: req.user.id } },
+        { role: { $ne: 'admin' } },
         {
           $or: [
             { name: { $regex: q, $options: 'i' } },
@@ -156,8 +157,8 @@ router.get('/suggestions', auth, async (req, res) => {
       ...existingRelations.map(f => f.requester.toString() === req.user.id ? f.recipient.toString() : f.requester.toString())
     ];
 
-    // Simple suggestion: users with at least one common genre
-    let query = { _id: { $nin: excludedIds } };
+    // Simple suggestion: users with at least one common genre, explicitly hiding admins
+    let query = { _id: { $nin: excludedIds }, role: { $ne: 'admin' } };
     if (userGenres.length > 0) {
       const genreQueries = userGenres.map(g => ({ [`tasteProfile.genres.${g}`]: { $exists: true } }));
       query.$or = genreQueries;

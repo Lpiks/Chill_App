@@ -22,7 +22,7 @@ import { colors } from '../../constants/colors';
 import { Message, Conversation, User } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import { getSocket } from '../../services/socket';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, requestRecordingPermissionsAsync, RecordingPresets } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -36,7 +36,7 @@ export default function ChatScreen() {
   
   const [inputText, setInputText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
-  const [recording, setRecording] = useState<any | null>(null);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
@@ -159,10 +159,10 @@ export default function ChatScreen() {
 
   const startRecording = async () => {
     try {
-      await Audio.requestPermissionsAsync();
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      setRecording(recording);
+      const { status } = await requestRecordingPermissionsAsync();
+      if (status !== 'granted') return;
+      
+      await audioRecorder.record();
       setIsRecording(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (err) {
@@ -171,12 +171,10 @@ export default function ChatScreen() {
   };
 
   const stopRecording = async () => {
-    if (!recording) return;
     setIsRecording(false);
-    await recording.stopAndUnloadAsync();
-    const uri = recording.getURI();
+    await audioRecorder.stop();
+    const uri = audioRecorder.uri;
     const duration = 0; // In a real app, calculate duration
-    setRecording(null);
 
     if (uri) {
       const formData = new FormData();
