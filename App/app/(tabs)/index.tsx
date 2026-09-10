@@ -28,8 +28,8 @@ export default function HomeScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  const handleSeeAll = () => {
-    Alert.alert('Bientôt disponible', 'Cette page sera bientôt ajoutée !');
+  const handleSeeAll = (category: string, title: string) => {
+    router.push(`/see-all?category=${category}&title=${encodeURIComponent(title)}`);
   };
 
   // Queries
@@ -308,7 +308,7 @@ export default function HomeScreen() {
             data={trending ? trending.slice(0, 10) : []} 
             loading={loadTrending}
             onPressItem={handlePressMedia}
-            onSeeAll={handleSeeAll}
+            onSeeAll={() => handleSeeAll('trending', 'Tendances')}
           />
 
           <MediaRow 
@@ -316,7 +316,7 @@ export default function HomeScreen() {
             data={action ? action.slice(0, 10) : []} 
             loading={loadAction}
             onPressItem={handlePressMedia}
-            onSeeAll={handleSeeAll}
+            onSeeAll={() => handleSeeAll('action', "Blockbusters d'Action")}
           />
 
           <MediaRow 
@@ -324,7 +324,7 @@ export default function HomeScreen() {
             data={comedies ? comedies.slice(0, 10) : []} 
             loading={loadComedies}
             onPressItem={handlePressMedia}
-            onSeeAll={handleSeeAll}
+            onSeeAll={() => handleSeeAll('comedies', 'Comédies à Mourir de Rire')}
           />
 
           <MediaRow 
@@ -332,7 +332,7 @@ export default function HomeScreen() {
             data={popular ? popular.slice(0, 10) : []} 
             loading={loadPopular}
             onPressItem={handlePressMedia}
-            onSeeAll={handleSeeAll}
+            onSeeAll={() => handleSeeAll('popular', 'Films Populaires')}
           />
 
           <MediaRow 
@@ -340,7 +340,7 @@ export default function HomeScreen() {
             data={series ? series.slice(0, 10) : []} 
             loading={loadSeries}
             onPressItem={handlePressMedia}
-            onSeeAll={handleSeeAll}
+            onSeeAll={() => handleSeeAll('series', 'Séries Populaires')}
           />
 
           <MediaRow 
@@ -348,7 +348,7 @@ export default function HomeScreen() {
             data={kdramas ? kdramas.slice(0, 10) : []} 
             loading={loadKdramas}
             onPressItem={handlePressMedia}
-            onSeeAll={handleSeeAll}
+            onSeeAll={() => handleSeeAll('kdramas', 'K-Dramas')}
           />
 
           <MediaRow 
@@ -356,7 +356,7 @@ export default function HomeScreen() {
             data={anime ? anime.slice(0, 10) : []} 
             loading={loadAnime}
             onPressItem={handlePressMedia}
-            onSeeAll={handleSeeAll}
+            onSeeAll={() => handleSeeAll('anime', "L'Univers Anime")}
           />
         </View>
       </ScrollView>
