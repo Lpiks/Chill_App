@@ -178,6 +178,22 @@ mongoose.connect(process.env.MONGODB_URI)
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  
+  // Render Free Tier Keep-Alive Workaround
+  // Render automatically sets the RENDER_EXTERNAL_URL environment variable.
+  const KEEP_ALIVE_URL = process.env.RENDER_EXTERNAL_URL;
+  if (KEEP_ALIVE_URL) {
+    const https = require('https');
+    setInterval(() => {
+      https.get(KEEP_ALIVE_URL, (resp) => {
+        if (resp.statusCode === 200) {
+          console.log('✅ [Keep-Alive] Ping successful. Server stays awake.');
+        }
+      }).on("error", (err) => {
+        console.log("❌ [Keep-Alive] Ping failed: " + err.message);
+      });
+    }, 10 * 60 * 1000); // Every 10 minutes
+  }
 });
 
 // Catch unhandled rejections (like Puppeteer closing early) so the server doesn't crash
