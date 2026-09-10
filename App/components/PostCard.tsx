@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Share, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
+import { showToast } from '../utils/toast';
 
 interface PostCardProps {
   post: any;
@@ -19,6 +20,7 @@ interface PostCardProps {
 export const PostCard = ({ post, onCommentPress }: PostCardProps) => {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [isReportModalVisible, setIsReportModalVisible] = useState(false);
 
   // Optimistic Like Mutation
   const likeMutation = useMutation({
@@ -57,7 +59,7 @@ export const PostCard = ({ post, onCommentPress }: PostCardProps) => {
       if (context?.previousFeed) {
         queryClient.setQueryData(['feed'], context.previousFeed);
       }
-      Alert.alert('Erreur', 'Impossible de liker ce post.');
+      showToast('error', 'Erreur', 'Impossible de liker ce post.');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['feed'] });
@@ -81,25 +83,18 @@ export const PostCard = ({ post, onCommentPress }: PostCardProps) => {
   };
 
   const handleReport = () => {
-    Alert.alert(
-      'Signaler',
-      'Pourquoi souhaites-tu signaler cette publication ?',
-      [
-        { text: 'Spam', onPress: () => sendReport('spam') },
-        { text: 'Harcèlement', onPress: () => sendReport('harassment') },
-        { text: 'Contenu inapproprié', onPress: () => sendReport('inappropriate') },
-        { text: 'Annuler', style: 'cancel' }
-      ]
-    );
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIsReportModalVisible(true);
   };
 
   const sendReport = async (reason: string) => {
+    setIsReportModalVisible(false);
     try {
       await api.post(`/posts/${post._id}/report`, { reason });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Merci', 'Ton signalement a été envoyé.');
+      showToast('success', 'Merci', 'Ton signalement a été envoyé.');
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible d\'envoyer le signalement.');
+      showToast('error', 'Erreur', 'Impossible d\'envoyer le signalement.');
     }
   };
 
@@ -120,6 +115,7 @@ export const PostCard = ({ post, onCommentPress }: PostCardProps) => {
       style={styles.container} 
       activeOpacity={1} 
       onLongPress={handleReport}
+      delayLongPress={200}
     >
       {/* User Header */}
       <View style={styles.header}>
@@ -202,6 +198,39 @@ export const PostCard = ({ post, onCommentPress }: PostCardProps) => {
           <Text style={styles.actionLabel}>Partager</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Custom Report Action Sheet */}
+      <Modal
+        visible={isReportModalVisible}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => setIsReportModalVisible(false)}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setIsReportModalVisible(false)}>
+          <View style={styles.actionSheet}>
+            <Text style={styles.actionSheetTitle}>Signaler la publication</Text>
+            
+            <TouchableOpacity style={styles.actionSheetBtn} onPress={() => sendReport('spam')}>
+              <Ionicons name="warning-outline" size={20} color="white" />
+              <Text style={styles.actionSheetText}>Spam</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.actionSheetBtn} onPress={() => sendReport('harassment')}>
+              <Ionicons name="sad-outline" size={20} color="white" />
+              <Text style={styles.actionSheetText}>Harcèlement</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionSheetBtn} onPress={() => sendReport('inappropriate')}>
+              <Ionicons name="close-circle-outline" size={20} color="white" />
+              <Text style={styles.actionSheetText}>Contenu inapproprié</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.actionSheetBtn, styles.actionSheetCancel]} onPress={() => setIsReportModalVisible(false)}>
+              <Text style={styles.actionSheetCancelText}>Annuler</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </TouchableOpacity>
   );
 };
@@ -255,6 +284,53 @@ const styles = StyleSheet.create({
     gap: 25
   },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  actionLabel: { color: 'white', fontSize: 14, fontWeight: '600' }
+  actionLabel: { color: 'white', fontSize: 14, fontWeight: '600' },
+  
+  // Custom Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  actionSheet: {
+    width: '100%',
+    backgroundColor: '#1E1E24',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)'
+  },
+  actionSheetTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center'
+  },
+  actionSheetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+    gap: 12
+  },
+  actionSheetText: {
+    color: 'white',
+    fontSize: 16
+  },
+  actionSheetCancel: {
+    borderBottomWidth: 0,
+    justifyContent: 'center',
+    marginTop: 10
+  },
+  actionSheetCancelText: {
+    color: colors.red,
+    fontSize: 16,
+    fontWeight: 'bold'
+  }
 });
 

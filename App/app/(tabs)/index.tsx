@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, RefreshControl, StyleSheet, View, TouchableOpacity, Text, Alert } from 'react-native';
+import { ScrollView, RefreshControl, StyleSheet, View, TouchableOpacity, Text, Modal } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -7,6 +7,7 @@ import { tmdbService } from '../../services/tmdb';
 import api from '../../services/api';
 import { HeroSlider } from '../../components/HeroSlider';
 import { MediaRow } from '../../components/MediaRow';
+import { ContinueWatchingCard } from '../../components/ContinueWatchingCard';
 import { colors } from '../../constants/colors';
 import { useRouter } from 'expo-router';
 import { Media } from '../../types';
@@ -14,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFriendStore } from '../../store/friendStore';
 import { useFocusEffect } from 'expo-router';
 import { BlurView } from 'expo-blur';
+import { showToast } from '../../utils/toast';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -220,71 +222,9 @@ export default function HomeScreen() {
             <View style={styles.continueSection}>
               <Text style={styles.sectionTitle}>Continuer à regarder</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 15 }}>
-                {progress.map((item: any) => {
-                  const progressPercent = item.duration > 0 ? Math.min((item.timestamp / item.duration) * 100, 100) : 0;
-                  return (
-                    <TouchableOpacity 
-                      key={item._id || item.tmdbId} 
-                      style={styles.continueCard}
-                      onLongPress={() => {
-                        Alert.alert(
-                          'Retirer de la liste',
-                          'Voulez-vous retirer ce titre de "Continuer à regarder" ?',
-                          [
-                            { text: 'Annuler', style: 'cancel' },
-                            { 
-                              text: 'Retirer', 
-                              style: 'destructive',
-                              onPress: async () => {
-                                // Optimistic UI Update
-                                const previousProgress = queryClient.getQueryData(['progress']);
-                                queryClient.setQueryData(['progress'], (old: any) => 
-                                  old?.filter((p: any) => p._id !== item._id)
-                                );
-                                
-                                try {
-                                  await api.delete(`/progress/${item._id}`);
-                                } catch (error) {
-                                  // Revert on failure
-                                  queryClient.setQueryData(['progress'], previousProgress);
-                                  Alert.alert('Erreur', 'Impossible de retirer le titre.');
-                                }
-                              }
-                            }
-                          ]
-                        );
-                      }}
-                      onPress={() => router.push({
-                        pathname: `/watch/${item.tmdbId}`,
-                        params: { 
-                          type: item.mediaType, 
-                          title: item.title, 
-                          posterPath: item.posterPath, 
-                          ...(item.mediaType === 'series' || item.mediaType === 'tv' ? { season: item.season?.toString(), episode: item.episode?.toString() } : {}) 
-                        }
-                      })}
-                    >
-                      <Image source={{ uri: `https://image.tmdb.org/t/p/w342${item.posterPath}` }} style={styles.continuePoster} contentFit="cover" transition={300} />
-                      <View style={styles.continueOverlay}>
-                        <Ionicons name="play-circle" size={40} color="white" style={styles.continuePlayBtn} />
-                      </View>
-                      
-                      {/* Meta Info for TV */}
-                      {(item.mediaType === 'series' || item.mediaType === 'tv') && item.season && item.episode && (
-                        <View style={styles.continueMetaBadge}>
-                          <Text style={styles.continueMetaText}>S{item.season} E{item.episode}</Text>
-                        </View>
-                      )}
-
-                      {/* Progress Bar */}
-                      {item.duration > 0 && (
-                        <View style={styles.progressBarContainer}>
-                          <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
+                {progress.map((item: any) => (
+                  <ContinueWatchingCard key={item._id || item.tmdbId} item={item} />
+                ))}
               </ScrollView>
             </View>
           )}
@@ -452,12 +392,4 @@ const styles = StyleSheet.create({
   companyLogo: { width: '100%', height: '100%' },
   
   continueSection: { marginBottom: 20 },
-  continueCard: { width: 140, height: 210, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.bg2 },
-  continuePoster: { width: '100%', height: '100%' },
-  continueOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
-  continuePlayBtn: { opacity: 0.8 },
-  continueMetaBadge: { position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  continueMetaText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
-  progressBarContainer: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 4, backgroundColor: 'rgba(255,255,255,0.2)' },
-  progressBarFill: { height: '100%', backgroundColor: colors.red },
 });

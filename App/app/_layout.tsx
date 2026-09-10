@@ -21,6 +21,8 @@ import * as Device from 'expo-device';
 import { useFriendStore } from '../store/friendStore';
 import Animated, { FadeOut, FadeIn } from 'react-native-reanimated';
 import { Image } from 'expo-image';
+import Toast from 'react-native-toast-message';
+import { toastConfig } from '../components/ui/CustomToast';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -199,6 +201,8 @@ export default function RootLayout() {
               />
             </Animated.View>
           )}
+          
+          <Toast config={toastConfig} />
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </QueryClientProvider>
