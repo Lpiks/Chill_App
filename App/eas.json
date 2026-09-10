@@ -15,10 +15,18 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_PROD_URL": "https://chill-app-5sw2.onrender.com/api",
+        "EXPO_PUBLIC_TMDB_API_KEY": "db37a4b3aab009d8e4d0d885751e7ea0"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_PROD_URL": "https://chill-app-5sw2.onrender.com/api",
+        "EXPO_PUBLIC_TMDB_API_KEY": "db37a4b3aab009d8e4d0d885751e7ea0"
+      }
     }
   },
   "submit": {
