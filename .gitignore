@@ -52,3 +52,8 @@ Starting A Coding Session3.md
 
 # Test Scripts
 Server/scripts/notifications/
+
+# Ignore unused corrupted avatars
+App/assets/avatars/avatar2.png
+App/assets/avatars/avatar3.png
+App/assets/avatars/avatar4.png
