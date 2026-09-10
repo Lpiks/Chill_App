@@ -1,4 +1,5 @@
 export interface User {
+  _id?: string;
   id: string;
   name: string;
   email?: string;
@@ -24,14 +25,6 @@ export interface Media {
   genres: string[];
 }
 
-export interface Message {
-  id: string;
-  senderId: string;
-  content: string;
-  type: 'text' | 'voice' | 'card';
-  createdAt: string;
-  seen: boolean;
-}
 
 export interface Room {
   roomId: string;

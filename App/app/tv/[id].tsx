@@ -20,7 +20,7 @@ import { Skeleton } from '../../components/ui/Skeleton';
 import { CastSlider } from '../../components/CastSlider';
 import * as Haptics from 'expo-haptics';
 import api from '../../services/api';
-import { Alert } from 'react-native';
+import { PremiumAlert } from '../../utils/PremiumAlert';
 
 const { width } = Dimensions.get('window');
 
@@ -75,7 +75,7 @@ export default function SeriesDetailScreen() {
       if (context?.previousStatus) {
         queryClient.setQueryData(['watchlist-check', tmdbId], context.previousStatus);
       }
-      Alert.alert('Erreur', 'Impossible de mettre à jour votre liste');
+      PremiumAlert.alert('Erreur', 'Impossible de mettre à jour votre liste');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['watchlist'] });

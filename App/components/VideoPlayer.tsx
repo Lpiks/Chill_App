@@ -18,6 +18,8 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useRouter } from 'expo-router';
 import Slider from '@react-native-community/slider';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import { BlurView } from 'expo-blur';
+import { PremiumAlert } from '../utils/PremiumAlert';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
 import Animated, { 
@@ -157,7 +159,7 @@ export const VideoPlayer = ({
 
   const checkLock = () => {
     if (isLocked && !isHost) {
-      Alert.alert('Action impossible', "Les contrôles sont verrouillés par l'hôte");
+      PremiumAlert.alert('Action impossible', "Les contrôles sont verrouillés par l'hôte");
       return true;
     }
     return false;
@@ -265,11 +267,12 @@ export const VideoPlayer = ({
         }
         
         setParsedCues(cues);
-        if (cues.length === 0) {
-          Alert.alert('Subtitle Error', 'The subtitle file was completely empty or parsing failed. First line: ' + text.substring(0, 50));
+        if (!text || text.trim().length === 0 || !text.includes('-->')) {
+          PremiumAlert.alert('Subtitle Error', 'The subtitle file was completely empty or parsing failed. First line: ' + text.substring(0, 50));
+          return;
         }
       } catch (err: any) {
-        Alert.alert('Subtitle Download Failed', err.message || 'Unknown error');
+        PremiumAlert.alert('Subtitle Download Failed', err.message || 'Unknown error');
       }
     };
 

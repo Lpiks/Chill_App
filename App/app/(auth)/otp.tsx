@@ -106,7 +106,7 @@ export default function OTPScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior="padding"
         style={{ flex: 1 }}
       >
         <View style={styles.header}>
@@ -126,7 +126,7 @@ export default function OTPScreen() {
             {otp.map((digit, i) => (
               <TextInput
                 key={i}
-                ref={(el) => (inputs.current[i] = el!)}
+                ref={(el) => { inputs.current[i] = el!; }}
                 style={[
                   styles.otpInput,
                   digit ? styles.otpInputFilled : null,

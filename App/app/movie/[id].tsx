@@ -6,8 +6,7 @@ import {
   ScrollView, 
   TouchableOpacity, 
   Dimensions,
-  Share,
-  Alert
+  Share
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -21,6 +20,7 @@ import { Skeleton } from '../../components/ui/Skeleton';
 import { CastSlider } from '../../components/CastSlider';
 import * as Haptics from 'expo-haptics';
 import api from '../../services/api';
+import { PremiumAlert } from '../../utils/PremiumAlert';
 
 const { width } = Dimensions.get('window');
 
@@ -74,7 +74,7 @@ export default function MovieDetailScreen() {
       if (context?.previousStatus) {
         queryClient.setQueryData(['watchlist-check', tmdbId], context.previousStatus);
       }
-      Alert.alert('Erreur', 'Impossible de mettre à jour votre liste');
+      PremiumAlert.alert('Erreur', 'Impossible de mettre à jour votre liste');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['watchlist'] });

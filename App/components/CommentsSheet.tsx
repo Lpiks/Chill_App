@@ -6,9 +6,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import { colors } from '../constants/colors';
+import { config } from '../constants/config';
 import * as Haptics from 'expo-haptics';
 
 export const CommentsSheet = ({ post, isVisible, onClose, onAddComment }: any) => {
@@ -179,7 +180,7 @@ export const CommentsSheet = ({ post, isVisible, onClose, onAddComment }: any) =
                     onPress={() => handleMentionSelect(item.name)}
                   >
                     {item.avatar ? (
-                      <Image source={{ uri: item.avatar.includes('http') ? item.avatar : `http://192.168.1.18:5000/uploads/avatars/${item.avatar}` }} style={styles.suggestionAvatar} />
+                      <Image source={{ uri: item.avatar.includes('http') ? item.avatar : `${config.apiUrl?.replace('/api', '')}/uploads/avatars/${item.avatar}` }} style={styles.suggestionAvatar} />
                     ) : (
                       <View style={[styles.suggestionAvatar, { backgroundColor: '#333', justifyContent: 'center', alignItems: 'center' }]}>
                         <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{item.name?.charAt(0) || '?'}</Text>

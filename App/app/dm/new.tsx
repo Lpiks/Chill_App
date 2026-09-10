@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../services/api';
 import { colors } from '../../constants/colors';
+import { PremiumAlert } from '../../utils/PremiumAlert';
 import { User } from '../../types';
 
 export default function NewConversationScreen() {
@@ -47,7 +48,7 @@ export default function NewConversationScreen() {
   const handleCreate = async () => {
     if (selectedFriends.length === 0) return;
     if (selectedFriends.length > 1 && !groupName.trim()) {
-      alert('Veuillez donner un nom au groupe');
+      PremiumAlert.alert('Erreur', 'Veuillez donner un nom au groupe');
       return;
     }
 
@@ -59,7 +60,7 @@ export default function NewConversationScreen() {
       });
       router.replace(`/dm/${data._id}`);
     } catch (e) {
-      alert('Erreur lors de la création de la conversation');
+      PremiumAlert.alert('Erreur', 'Erreur lors de la création de la conversation');
     } finally {
       setIsCreating(false);
     }
@@ -126,10 +127,10 @@ export default function NewConversationScreen() {
       </View>
 
       <FlashList
-        data={filteredFriends}
+        data={filteredFriends || []}
         renderItem={renderFriend}
-        estimatedItemSize={70}
-        keyExtractor={item => item.id}
+        {...({ estimatedItemSize: 60 } as any)}
+        keyExtractor={(item: any) => item._id}
         ListEmptyComponent={
           !isLoading && (
             <View style={styles.emptyContainer}>

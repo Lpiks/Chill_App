@@ -7,14 +7,14 @@ import {
   TouchableOpacity, 
   KeyboardAvoidingView, 
   Platform,
-  ActivityIndicator,
-  Alert
+  ActivityIndicator
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '../../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import api from '../../services/api';
+import { PremiumAlert } from '../../utils/PremiumAlert';
 
 export default function ChangePasswordScreen() {
   const router = useRouter();
@@ -40,7 +40,7 @@ export default function ChangePasswordScreen() {
       
       setLoading(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Succès', 'Votre mot de passe a été mis à jour avec succès.', [
+      PremiumAlert.alert('Succès', 'Votre mot de passe a été mis à jour avec succès.', [
         { text: 'OK', onPress: () => router.back() }
       ]);
     } catch (err: any) {

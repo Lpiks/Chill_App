@@ -104,7 +104,7 @@ export default function FriendsListScreen() {
           <FlashList
             data={filteredFriends}
             renderItem={renderFriend}
-            estimatedItemSize={80}
+            {...({ estimatedItemSize: 80 } as any)}
             onRefresh={refetch}
             refreshing={isLoading}
             ListEmptyComponent={

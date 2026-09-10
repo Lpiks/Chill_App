@@ -10,7 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/authStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { Alert, Platform, StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import * as NavigationBar from 'expo-navigation-bar';
@@ -23,6 +23,8 @@ import Animated, { FadeOut, FadeIn } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import Toast from 'react-native-toast-message';
 import { toastConfig } from '../components/ui/CustomToast';
+import { GlobalAlert } from '../components/GlobalAlert';
+import { PremiumAlert } from '../utils/PremiumAlert';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -76,7 +78,9 @@ export default function RootLayout() {
       });
 
       if (!result.success) {
-        Alert.alert('Échec', 'Authentification biométrique échouée');
+        setBiometric(false);
+        PremiumAlert.alert('Échec', 'Authentification biométrique échouée');
+        return;
       }
     }
   };
@@ -104,7 +108,7 @@ export default function RootLayout() {
     if (biometricPref === null) {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       if (hasHardware) {
-        Alert.alert(
+        PremiumAlert.alert(
           'Biométrie',
           'Voulez-vous activer Face ID / Touch ID pour vos prochaines connexions ?',
           [
@@ -159,9 +163,6 @@ export default function RootLayout() {
           return;
         }
         token = (await Notifications.getExpoPushTokenAsync()).data;
-        console.log("=========================================");
-        console.log("🔑 EXPO PUSH TOKEN: ", token);
-        console.log("=========================================");
       }
 
       if (Platform.OS === 'android') {
@@ -203,6 +204,7 @@ export default function RootLayout() {
           )}
           
           <Toast config={toastConfig} />
+          <GlobalAlert />
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </QueryClientProvider>

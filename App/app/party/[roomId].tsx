@@ -30,6 +30,7 @@ import Animated, {
   Easing,
   runOnJS
 } from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
 
 import { colors } from '../../constants/colors';
 import { config } from '../../constants/config';
@@ -39,6 +40,7 @@ import { VideoPlayer, SubtitleTrack } from '../../components/VideoPlayer';
 import { tmdbService } from '../../services/tmdb';
 import { subtitlesService } from '../../services/subtitles';
 import { ClientSideExtractor } from '../../components/ClientSideExtractor';
+import { PremiumAlert } from '../../utils/PremiumAlert';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const REACTIONS = ['😀', '😂', '😱', '❤️', '👏', '🔥'];
@@ -229,7 +231,7 @@ export default function WatchPartyRoom() {
     });
 
     socketRef.current.on('party-ended', () => {
-      Alert.alert('Fin de la Party', 'L\'hôte a terminé la salle.');
+      PremiumAlert.alert('Fin de la Party', 'L\'hôte a terminé la salle.');
       router.replace('/party');
     });
 
@@ -286,7 +288,7 @@ export default function WatchPartyRoom() {
   };
 
   const handleEndRoom = () => {
-    Alert.alert(
+    PremiumAlert.alert(
       'Terminer la salle ?',
       'Tous les membres seront déconnectés.',
       [

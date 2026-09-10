@@ -16,6 +16,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
+import { BlurView } from 'expo-blur';
+import { PremiumAlert } from '../../utils/PremiumAlert';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ProfileScreen() {
   const { user, logout, isBiometricEnabled, setBiometric } = useAuthStore();
@@ -34,9 +37,10 @@ export default function ProfileScreen() {
     try {
       await Image.clearDiskCache();
       await Image.clearMemoryCache();
-      Alert.alert('Succès', 'Le cache de l\'application a été vidé avec succès.');
-    } catch (error) {
-      Alert.alert('Erreur', 'Impossible de vider le cache.');
+      await AsyncStorage.clear();
+      PremiumAlert.alert('Succès', 'Le cache de l\'application a été vidé avec succès.');
+    } catch (e) {
+      PremiumAlert.alert('Erreur', 'Impossible de vider le cache.');
     }
   };
 
@@ -46,7 +50,7 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert('Déconnexion', 'Êtes-vous sûr de vouloir vous déconnecter ?', [
+    PremiumAlert.alert('Déconnexion', 'Êtes-vous sûr de vouloir vous déconnecter ?', [
       { text: 'Annuler', style: 'cancel' },
       { 
         text: 'Déconnexion', 
@@ -54,7 +58,7 @@ export default function ProfileScreen() {
         onPress: () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
           logout();
-          router.replace('/(auth)/login');
+          router.replace('/(auth)/welcome');
         } 
       },
     ]);

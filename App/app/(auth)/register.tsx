@@ -92,7 +92,7 @@ export default function RegisterScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior="padding"
         style={{ flex: 1 }}
       >
         <View style={styles.header}>

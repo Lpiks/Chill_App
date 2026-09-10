@@ -70,7 +70,7 @@ export default function LoginScreen() {
       ) : null}
 
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior="padding"
         style={{ flex: 1 }}
       >
         <View style={styles.header}>

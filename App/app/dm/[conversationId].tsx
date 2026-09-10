@@ -24,6 +24,9 @@ import { useAuthStore } from '../../store/authStore';
 import { getSocket } from '../../services/socket';
 import { useAudioRecorder, requestRecordingPermissionsAsync, RecordingPresets } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import { io, Socket } from 'socket.io-client';
+import { PremiumAlert } from '../../utils/PremiumAlert';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -136,9 +139,8 @@ export default function ChatScreen() {
       });
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (error: any) {
-      if (error.response?.status === 403) {
-        alert(error.response.data.message);
-      }
+      console.error('Error fetching messages:', error);
+      PremiumAlert.alert('Erreur', error.response?.data?.message || 'Erreur lors du chargement des messages');
     }
   };
 
@@ -343,7 +345,7 @@ export default function ChatScreen() {
           ) : (
             <TouchableOpacity 
               style={styles.micBtn}
-              onPress={() => alert('Les messages vocaux seront disponibles demain !')}
+              onPress={() => PremiumAlert.alert('Info', 'Les messages vocaux seront disponibles demain !')}
             >
               <Ionicons name="mic-outline" size={26} color="white" />
             </TouchableOpacity>

@@ -20,6 +20,7 @@ import { Image } from 'expo-image';
 import { colors } from '../../constants/colors';
 import { config } from '../../constants/config';
 import api from '../../services/api';
+import { PremiumAlert } from '../../utils/PremiumAlert';
 
 export default function WatchPartyHub() {
   const router = useRouter();
@@ -36,7 +37,7 @@ export default function WatchPartyHub() {
 
   const handleJoin = async () => {
     if (!roomCode || roomCode.length < 6) {
-      Alert.alert('Code invalide', 'Le code de la salle doit comporter 6 caractères.');
+      PremiumAlert.alert('Code invalide', 'Le code de la salle doit comporter 6 caractères.');
       return;
     }
 
@@ -49,7 +50,7 @@ export default function WatchPartyHub() {
         router.push(`/party/${roomCode.toUpperCase()}`);
       }
     } catch (error) {
-      Alert.alert('Erreur', 'Salle introuvable ou expirée.');
+      PremiumAlert.alert('Erreur', 'Salle introuvable ou expirée.');
     } finally {
       setJoining(false);
     }

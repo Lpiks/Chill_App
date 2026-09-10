@@ -7,13 +7,14 @@ import {
   RefreshControl,
   ActionSheetIOS,
   Platform,
-  Share,
-  Alert
+  Share
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import { PremiumAlert } from '../../utils/PremiumAlert';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
@@ -58,7 +59,7 @@ export default function WatchlistScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     },
     onError: () => {
-      Alert.alert('Erreur', 'Impossible de retirer de la liste');
+      PremiumAlert.alert('Erreur', 'Impossible de retirer de la liste');
     }
   });
 
@@ -99,7 +100,7 @@ export default function WatchlistScreen() {
         }
       );
     } else {
-      Alert.alert(
+      PremiumAlert.alert(
         item.title,
         'Actions rapides',
         [
@@ -222,7 +223,7 @@ export default function WatchlistScreen() {
           <FlashList
             data={filteredData}
             renderItem={renderItem}
-            estimatedItemSize={250}
+            {...({ estimatedItemSize: 250 } as any)}
             numColumns={2}
             contentContainerStyle={styles.listContent}
             refreshControl={

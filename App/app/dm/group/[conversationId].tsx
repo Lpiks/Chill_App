@@ -15,8 +15,9 @@ import api from '../../../services/api';
 import { colors } from '../../../constants/colors';
 import { Conversation, User } from '../../../types';
 import { useAuthStore } from '../../../store/authStore';
+import { PremiumAlert } from '../../../utils/PremiumAlert';
 
-export default function GroupInfoScreen() {
+export default function GroupDetailsScreen() {
   const { conversationId } = useLocalSearchParams();
   const router = useRouter();
   const { user: currentUser } = useAuthStore();
@@ -34,9 +35,10 @@ export default function GroupInfoScreen() {
   const handleLeaveGroup = async () => {
     try {
       await api.delete(`/conversations/${conversationId}/members/${currentUser?._id}`);
-      router.replace('/dm');
-    } catch (e) {
-      alert('Erreur lors de la sortie du groupe');
+      router.replace('/(tabs)/dm');
+    } catch (error) {
+      console.error(error);
+      PremiumAlert.alert('Erreur', 'Erreur lors de la sortie du groupe');
     }
   };
 

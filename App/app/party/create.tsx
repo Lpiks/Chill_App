@@ -16,12 +16,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
+import { BlurView } from 'expo-blur';
 
 import { colors } from '../../constants/colors';
 import { config } from '../../constants/config';
 import { tmdbService } from '../../services/tmdb';
 import api from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import { PremiumAlert } from '../../utils/PremiumAlert';
 
 export default function CreatePartyScreen() {
   const router = useRouter();
@@ -79,7 +81,7 @@ export default function CreatePartyScreen() {
   const handleCreateRoom = async () => {
     // Premium Check
     if (user?.subscriptionTier !== 'premium') {
-      Alert.alert(
+      PremiumAlert.alert(
         'Premium Requis',
         'Watch Party est une fonctionnalité Premium. Passez à Premium pour regarder avec vos amis !',
         [
@@ -107,7 +109,7 @@ export default function CreatePartyScreen() {
       queryClient.invalidateQueries({ queryKey: ['party-recent'] });
       router.push(`/party/${res.data.roomId}`);
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible de créer la salle.');
+      PremiumAlert.alert('Erreur', 'Impossible de créer la salle.');
     }
   };
 
@@ -117,7 +119,7 @@ export default function CreatePartyScreen() {
       setSelectedFriends(selectedFriends.filter(f => f !== id));
     } else {
       if (selectedFriends.length >= 4) {
-        Alert.alert('Limite atteinte', 'Vous pouvez inviter jusqu\'à 4 amis.');
+        PremiumAlert.alert('Limite atteinte', 'Vous pouvez inviter jusqu\'à 4 amis.');
         return;
       }
       setSelectedFriends([...selectedFriends, id]);

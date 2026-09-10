@@ -12,6 +12,7 @@ import api from '../../services/api';
 import { FlashList } from '@shopify/flash-list';
 import { PostCard } from '../../components/PostCard';
 import * as Haptics from 'expo-haptics';
+import { PremiumAlert } from '../../utils/PremiumAlert';
 
 const { width } = Dimensions.get('window');
 
@@ -174,9 +175,9 @@ export default function UserProfileScreen() {
               <View style={styles.row}>
                 <TouchableOpacity 
                   style={[styles.primaryBtn, styles.friendsBtn]}
-                  onLongPress={() => {
-                    Alert.alert('Retirer', 'Voulez-vous retirer cet ami ?', [
-                      { text: 'Annuler' },
+                  onPress={() => {
+                    PremiumAlert.alert('Retirer', 'Voulez-vous retirer cet ami ?', [
+                      { text: 'Annuler', style: 'cancel' },
                       { text: 'Retirer', style: 'destructive', onPress: () => unfriendMutation.mutate() }
                     ]);
                   }}

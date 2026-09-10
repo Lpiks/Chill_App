@@ -3,14 +3,14 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   Text, 
-  View, 
-  Alert 
+  View 
 } from 'react-native';
 import { Image } from 'expo-image';
 import { colors } from '../constants/colors';
 import { config } from '../constants/config';
 import * as Haptics from 'expo-haptics';
 import { Media } from '../types';
+import { PremiumAlert } from '../utils/PremiumAlert';
 
 interface MediaCardProps {
   item: Media;
@@ -25,7 +25,7 @@ export const MediaCard = ({ item, onPress, showType, size = 'md' }: MediaCardPro
 
   const handleLongPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
+    PremiumAlert.alert(
       item.title,
       'Actions rapides',
       [
