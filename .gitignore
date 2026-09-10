@@ -46,7 +46,7 @@ build/
 Thumbs.db
 
 # Firebase Credentials
-google-services.json
+
 *-firebase-adminsdk-*.json
 Starting A Coding Session3.md
 
