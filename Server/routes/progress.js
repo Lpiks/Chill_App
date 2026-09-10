@@ -45,4 +45,14 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
+// DELETE /api/progress/:id - Delete a progress entry
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    await Progress.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;

@@ -7,7 +7,8 @@ import {
   TouchableOpacity,
   ImageBackground,
   ScrollView,
-  Image
+  Image,
+  AppState
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -108,9 +109,9 @@ export default function WatchScreen() {
   const currentTimeRef = useRef(0);
   const [videoDuration, setVideoDuration] = useState(0);
 
-  // 3. Auto-Save Progress (Every 10s)
+  // 3. Auto-Save Progress (Every 10s) & AppState listener
   useEffect(() => {
-    const interval = setInterval(async () => {
+    const saveProgress = async () => {
       const time = currentTimeRef.current;
       if (!time || time < 10) return;
 
@@ -126,9 +127,20 @@ export default function WatchScreen() {
           duration: videoDuration
         });
       } catch (err) {}
-    }, 10000); // 10s for quicker updates
+    };
 
-    return () => clearInterval(interval);
+    const interval = setInterval(saveProgress, 10000); // 10s for quicker updates
+
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'inactive' || nextAppState === 'background') {
+        saveProgress();
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
   }, [videoDuration, id, type, title, posterPath, season, episode]);
 
   const renderProviderMenu = () => (

@@ -226,6 +226,34 @@ export default function HomeScreen() {
                     <TouchableOpacity 
                       key={item._id || item.tmdbId} 
                       style={styles.continueCard}
+                      onLongPress={() => {
+                        Alert.alert(
+                          'Retirer de la liste',
+                          'Voulez-vous retirer ce titre de "Continuer à regarder" ?',
+                          [
+                            { text: 'Annuler', style: 'cancel' },
+                            { 
+                              text: 'Retirer', 
+                              style: 'destructive',
+                              onPress: async () => {
+                                // Optimistic UI Update
+                                const previousProgress = queryClient.getQueryData(['progress']);
+                                queryClient.setQueryData(['progress'], (old: any) => 
+                                  old?.filter((p: any) => p._id !== item._id)
+                                );
+                                
+                                try {
+                                  await api.delete(`/progress/${item._id}`);
+                                } catch (error) {
+                                  // Revert on failure
+                                  queryClient.setQueryData(['progress'], previousProgress);
+                                  Alert.alert('Erreur', 'Impossible de retirer le titre.');
+                                }
+                              }
+                            }
+                          ]
+                        );
+                      }}
                       onPress={() => router.push({
                         pathname: `/watch/${item.tmdbId}`,
                         params: { 
