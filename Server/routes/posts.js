@@ -108,6 +108,29 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
+// PUT /api/posts/:id - Edit Post
+router.put('/:id', auth, async (req, res) => {
+  const { rating, review } = req.body;
+
+  try {
+    const post = await Post.findOne({ _id: req.params.id, userId: req.user.id });
+    if (!post) {
+      return res.status(404).json({ message: 'Post non trouvé ou non autorisé' });
+    }
+
+    if (rating !== undefined) post.rating = rating;
+    if (review !== undefined) post.review = review;
+
+    await post.save();
+    
+    const populatedPost = await Post.findById(post._id).populate('userId', 'name avatar');
+    res.json(populatedPost);
+  } catch (error) {
+    console.error('[EditPost] Error:', error);
+    res.status(500).json({ message: 'Erreur lors de la modification' });
+  }
+});
+
 // DELETE /api/posts/:id - Delete Post
 router.delete('/:id', auth, async (req, res) => {
   try {

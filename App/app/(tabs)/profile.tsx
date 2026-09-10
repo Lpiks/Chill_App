@@ -25,8 +25,8 @@ export default function ProfileScreen() {
   // Mock data for the "Pro" look
   const stats = [
     { label: 'Avis', value: '12', icon: 'chatbubble-ellipses-outline' },
-    { label: 'Vus', value: '48', icon: 'eye-outline' },
-    { label: 'Points', value: '850', icon: 'star-outline' },
+    { label: 'Vues', value: '48', icon: 'eye-outline' },
+    { label: 'Amis', value: '24', icon: 'people-outline' },
   ];
 
   const handleClearCache = async () => {
@@ -134,6 +134,25 @@ export default function ProfileScreen() {
               <Text style={styles.statLabel}>{stat.label}</Text>
             </View>
           ))}
+        </View>
+
+        {/* My Posts Button */}
+        <View style={styles.section}>
+          <TouchableOpacity 
+            style={styles.myPostsBtn}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/profile/my-posts');
+            }}
+          >
+            <View style={styles.myPostsLeft}>
+              <View style={styles.myPostsIconBg}>
+                <Ionicons name="images-outline" size={20} color="white" />
+              </View>
+              <Text style={styles.myPostsText}>Mes Publications</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="white" />
+          </TouchableOpacity>
         </View>
 
         {/* Account Settings */}
@@ -264,6 +283,28 @@ const styles = StyleSheet.create({
   statValue: { color: 'white', fontSize: 18, fontWeight: 'bold' },
   statValueSmall: { color: 'white', fontSize: 14, fontWeight: 'bold' },
   statLabel: { color: colors.muted, fontSize: 12 },
+  
+  myPostsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.bg2,
+    padding: 15,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  myPostsLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  myPostsIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: colors.red,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  myPostsText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+
   section: { paddingHorizontal: 20, marginBottom: 25 },
   sectionTitle: { color: colors.muted, fontSize: 13, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 10, marginLeft: 5 },
   sectionCard: { backgroundColor: colors.bg2, borderRadius: 20, overflow: 'hidden' },

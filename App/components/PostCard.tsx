@@ -11,6 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import { showToast } from '../utils/toast';
+import { useAuthStore } from '../store/authStore';
 
 interface PostCardProps {
   post: any;
@@ -20,7 +21,12 @@ interface PostCardProps {
 export const PostCard = ({ post, onCommentPress }: PostCardProps) => {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  
   const [isReportModalVisible, setIsReportModalVisible] = useState(false);
+  const [isManageModalVisible, setIsManageModalVisible] = useState(false);
+
+  const isMyPost = post?.user?._id === user?.id || post?.userId?._id === user?.id || post?.userId === user?.id;
 
   // Optimistic Like Mutation
   const likeMutation = useMutation({
@@ -82,9 +88,25 @@ export const PostCard = ({ post, onCommentPress }: PostCardProps) => {
     }
   };
 
-  const handleReport = () => {
+  const handleLongPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setIsReportModalVisible(true);
+    if (isMyPost) {
+      setIsManageModalVisible(true);
+    } else {
+      setIsReportModalVisible(true);
+    }
+  };
+
+  const handleDelete = async () => {
+    setIsManageModalVisible(false);
+    try {
+      await api.delete(`/posts/${post._id}`);
+      queryClient.invalidateQueries({ queryKey: ['my-posts'] });
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      showToast('success', 'Succès', 'Publication supprimée');
+    } catch (error) {
+      showToast('error', 'Erreur', 'Impossible de supprimer cette publication.');
+    }
   };
 
   const sendReport = async (reason: string) => {
@@ -114,16 +136,23 @@ export const PostCard = ({ post, onCommentPress }: PostCardProps) => {
     <TouchableOpacity 
       style={styles.container} 
       activeOpacity={1} 
-      onLongPress={handleReport}
+      onLongPress={handleLongPress}
       delayLongPress={200}
     >
       {/* User Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.userSection} onPress={navigateToProfile}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {username.charAt(0).toUpperCase()}
-            </Text>
+            {post.user?.avatarUrl || post.userId?.avatarUrl || post.user?.avatar || post.userId?.avatar ? (
+              <Image 
+                source={{ uri: post.user?.avatarUrl || post.userId?.avatarUrl || post.user?.avatar || post.userId?.avatar }} 
+                style={{ width: '100%', height: '100%', borderRadius: 20 }} 
+              />
+            ) : (
+              <Text style={styles.avatarText}>
+                {username.charAt(0).toUpperCase()}
+              </Text>
+            )}
           </View>
           <View>
             <Text style={styles.username}>{username}</Text>
@@ -132,7 +161,7 @@ export const PostCard = ({ post, onCommentPress }: PostCardProps) => {
             </Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.moreBtn} onPress={handleReport}>
+        <TouchableOpacity style={styles.moreBtn} onPress={handleLongPress}>
           <Ionicons name="ellipsis-horizontal" size={20} color={colors.muted} />
         </TouchableOpacity>
       </View>
@@ -226,6 +255,45 @@ export const PostCard = ({ post, onCommentPress }: PostCardProps) => {
             </TouchableOpacity>
 
             <TouchableOpacity style={[styles.actionSheetBtn, styles.actionSheetCancel]} onPress={() => setIsReportModalVisible(false)}>
+              <Text style={styles.actionSheetCancelText}>Annuler</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Custom Manage Action Sheet */}
+      <Modal
+        visible={isManageModalVisible}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => setIsManageModalVisible(false)}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setIsManageModalVisible(false)}>
+          <View style={styles.actionSheet}>
+            <Text style={styles.actionSheetTitle}>Gérer ma publication</Text>
+            
+            <TouchableOpacity style={styles.actionSheetBtn} onPress={() => { 
+              setIsManageModalVisible(false); 
+              router.push({
+                pathname: `/edit-post/${post._id}`,
+                params: {
+                  title: post.title,
+                  posterPath: post.posterPath,
+                  rating: post.rating.toString(),
+                  review: post.review || ''
+                }
+              });
+            }}>
+              <Ionicons name="pencil-outline" size={20} color="white" />
+              <Text style={styles.actionSheetText}>Modifier</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.actionSheetBtn} onPress={handleDelete}>
+              <Ionicons name="trash-outline" size={20} color={colors.red} />
+              <Text style={[styles.actionSheetText, { color: colors.red }]}>Supprimer</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={[styles.actionSheetBtn, styles.actionSheetCancel]} onPress={() => setIsManageModalVisible(false)}>
               <Text style={styles.actionSheetCancelText}>Annuler</Text>
             </TouchableOpacity>
           </View>

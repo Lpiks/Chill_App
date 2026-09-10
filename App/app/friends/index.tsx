@@ -49,8 +49,8 @@ export default function FindFriendsScreen() {
         onPress={() => router.push(`/profile/${item._id || item.id}`)}
       >
         <View style={styles.avatar}>
-          {item.avatar ? (
-            <Image source={{ uri: item.avatar }} style={styles.avatarImage} />
+          {item.avatarUrl || item.avatar ? (
+            <Image source={{ uri: item.avatarUrl || item.avatar }} style={styles.avatarImage} />
           ) : (
             <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
           )}
@@ -123,6 +123,7 @@ export default function FindFriendsScreen() {
             <FlashList
               data={searchResults}
               renderItem={renderUser}
+              // @ts-ignore
               estimatedItemSize={80}
               ListEmptyComponent={
                 <View style={styles.emptyState}>
@@ -143,6 +144,7 @@ export default function FindFriendsScreen() {
               <FlashList
                 data={suggestions}
                 renderItem={renderUser}
+                // @ts-ignore
                 estimatedItemSize={80}
                 horizontal={false}
                 scrollEnabled={false}
