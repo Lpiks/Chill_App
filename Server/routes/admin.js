@@ -9,6 +9,7 @@ const Progress = require('../models/Progress');
 const Trending = require('../models/Trending');
 const Setting = require('../models/Setting');
 const Notification = require('../models/Notification');
+const { sendPushNotification } = require('../utils/push');
 const adminAuth = require('../middleware/adminAuth');
 
 // 1. Admin Login
@@ -401,11 +402,17 @@ router.post('/notifications/send', async (req, res) => {
 
     const notifications = users.map(u => ({
       userId: u._id,
-      title,
-      message,
-      type: 'admin_broadcast'
+      type: 'system_alert',
+      fromUser: req.user.id,
+      data: { title, message }
     }));
     await Notification.insertMany(notifications);
+
+    // Send Push Notifications
+    users.forEach(u => {
+      sendPushNotification(u._id, title || 'Annonce Système', message, { type: 'system_alert' });
+    });
+
     res.json({ message: 'Notification envoyée', count: users.length });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });

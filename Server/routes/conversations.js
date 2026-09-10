@@ -4,6 +4,8 @@ const auth = require('../middleware/auth');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
+const { sendPushNotification } = require('../utils/push');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
@@ -163,6 +165,28 @@ router.post('/:id/messages', [auth, checkMessageLimit], async (req, res) => {
     const populatedMessage = await Message.findById(message._id).populate('senderId', 'name avatar');
     io.to(`conversation:${req.params.id}`).emit('new-message', populatedMessage);
 
+    // Send Push Notifications & Save Notification Docs
+    const conversation = await Conversation.findById(req.params.id);
+    const sender = await User.findById(req.user.id);
+    const notifications = [];
+    conversation.members.forEach(memberId => {
+      if (memberId.toString() !== req.user.id) {
+        notifications.push({
+          userId: memberId,
+          type: 'new_message',
+          fromUser: req.user.id,
+          data: { conversationId: req.params.id }
+        });
+        sendPushNotification(
+          memberId,
+          sender ? sender.name : 'Nouveau message',
+          type === 'text' ? content : (type === 'voice' ? '🎤 Message vocal' : '🎬 Partage de film'),
+          { type: 'new_message', conversationId: req.params.id }
+        );
+      }
+    });
+    await Notification.insertMany(notifications);
+
     res.status(201).json(populatedMessage);
   } catch (error) {
     console.error(error);
@@ -200,6 +224,28 @@ router.post('/:id/messages/voice', [auth, checkMessageLimit, upload.single('audi
 
     const populatedMessage = await Message.findById(message._id).populate('senderId', 'name avatar');
     io.to(`conversation:${req.params.id}`).emit('new-message', populatedMessage);
+
+    // Send Push Notifications & Save Notification Docs
+    const conversation = await Conversation.findById(req.params.id);
+    const sender = await User.findById(req.user.id);
+    const notifications = [];
+    conversation.members.forEach(memberId => {
+      if (memberId.toString() !== req.user.id) {
+        notifications.push({
+          userId: memberId,
+          type: 'new_message',
+          fromUser: req.user.id,
+          data: { conversationId: req.params.id }
+        });
+        sendPushNotification(
+          memberId,
+          sender ? sender.name : 'Nouveau message',
+          '🎤 Message vocal',
+          { type: 'new_message', conversationId: req.params.id }
+        );
+      }
+    });
+    await Notification.insertMany(notifications);
 
     res.status(201).json(populatedMessage);
   } catch (error) {

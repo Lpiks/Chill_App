@@ -38,7 +38,14 @@
       "expo-image",
       "expo-splash-screen",
       "expo-status-bar",
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#E50914"
+        }
+      ]
     ],
     "extra": {
       "router": {

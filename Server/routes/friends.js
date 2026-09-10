@@ -4,34 +4,7 @@ const auth = require('../middleware/auth');
 const Friendship = require('../models/Friendship');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
-const { Expo } = require('expo-server-sdk');
-
-const expo = new Expo();
-
-// Helper to send push notification
-async function sendPushNotification(userId, title, body, data) {
-  try {
-    const user = await User.findById(userId);
-    if (!user || !user.expoPushToken) return;
-
-    if (!Expo.isExpoPushToken(user.expoPushToken)) {
-      console.error(`Push token ${user.expoPushToken} is not a valid Expo push token`);
-      return;
-    }
-
-    const messages = [{
-      to: user.expoPushToken,
-      sound: 'default',
-      title,
-      body,
-      data,
-    }];
-
-    await expo.sendPushNotificationsAsync(messages);
-  } catch (error) {
-    console.error('Error sending push notification:', error);
-  }
-}
+const { sendPushNotification } = require('../utils/push');
 
 // GET /api/friends - Get friends list
 router.get('/', auth, async (req, res) => {

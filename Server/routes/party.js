@@ -4,6 +4,8 @@ const Room = require('../models/Room');
 const Notification = require('../models/Notification');
 const auth = require('../middleware/auth');
 const crypto = require('crypto');
+const User = require('../models/User');
+const { sendPushNotification } = require('../utils/push');
 
 // Helper to generate 6-char room ID
 const generateRoomId = () => {
@@ -47,10 +49,18 @@ router.post('/rooms', auth, async (req, res) => {
       }));
       await Notification.insertMany(notifications);
       
-      // Emit socket notification if io is available
+      const host = await User.findById(req.user.id);
+      
+      // Emit socket notification and send Push
       const io = req.app.get('io');
       invitedFriendIds.forEach(friendId => {
         io.to(`user:${friendId}`).emit('new-notification');
+        sendPushNotification(
+          friendId, 
+          'Watch Party ! 🍿', 
+          `${host ? host.name : 'Un ami'} t'a invité à regarder ${title}`, 
+          { type: 'watch_party_invite', roomId }
+        );
       });
     }
 
