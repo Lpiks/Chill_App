@@ -233,6 +233,7 @@ export const ClientSideExtractor = ({
         userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         style={{ width: 1, height: 1, opacity: 0.01 }}
         originWhitelist={['*']}
+        mixedContentMode="always"
       />
     </View>
   );
@@ -241,11 +242,12 @@ export const ClientSideExtractor = ({
 const styles = StyleSheet.create({
   hiddenContainer: {
     position: 'absolute',
-    top: -10000, // Move completely off-screen
-    left: -10000,
+    top: 0,
+    left: 0,
     width: 1,
     height: 1,
-    opacity: 0,
+    opacity: 0.01,
+    zIndex: -1,
     overflow: 'hidden'
   }
 });
