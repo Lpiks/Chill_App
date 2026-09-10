@@ -101,10 +101,10 @@ export default function HomeScreen() {
 
   const COMPANIES = [
     { id: 213, name: 'Netflix', logo: 'https://image.tmdb.org/t/p/w500/wwemzKWzjKYJFfCeiB57q3r4Bcm.png' },
-    { id: 49, name: 'HBO', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/HBO_logo.svg/512px-HBO_logo.svg.png' },
-    { id: 2552, name: 'Apple TV+', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/Apple_TV_Plus_Logo.svg/512px-Apple_TV_Plus_Logo.svg.png' },
-    { id: 2739, name: 'Disney+', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Disney%2B_logo.svg/512px-Disney%2B_logo.svg.png' },
-    { id: 1024, name: 'Amazon Prime', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/Amazon_Prime_Video_logo.svg/512px-Amazon_Prime_Video_logo.svg.png' },
+    { id: 49, name: 'HBO', logo: 'https://image.tmdb.org/t/p/w500/tuomPhY2UtuPTqqFnKMVHvSb724.png' },
+    { id: 2552, name: 'Apple TV+', logo: 'https://image.tmdb.org/t/p/w500/bngHRFi794mnMq34gfVcm9nDxN1.png' },
+    { id: 2739, name: 'Disney+', logo: 'https://image.tmdb.org/t/p/w500/1edZOYAfoyZyZ3rklNSiUpXX30Q.png' },
+    { id: 1024, name: 'Amazon Prime', logo: 'https://image.tmdb.org/t/p/w500/w7HfLNm9CWwRmAMU58udl2L7We7.png' },
   ];
 
   const { data: progress, isLoading: loadProgress, refetch: refetchProgress } = useQuery({
@@ -434,9 +434,22 @@ const styles = StyleSheet.create({
   },
   content: { paddingTop: 20, paddingBottom: 100 },
   sectionTitle: { color: 'white', fontSize: 18, fontWeight: 'bold', marginLeft: 20, marginBottom: 15, marginTop: 10 },
-  companiesRow: { paddingHorizontal: 20, gap: 15, marginBottom: 20 },
-  companyCard: { width: 120, height: 70, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, justifyContent: 'center', alignItems: 'center', padding: 15, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  companyLogo: { width: '100%', height: '100%', tintColor: 'white' },
+  companiesRow: { paddingHorizontal: 20, gap: 15, marginBottom: 25 },
+  companyCard: { 
+    width: 120, 
+    height: 70, 
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 12, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    padding: 15,
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  companyLogo: { width: '100%', height: '100%' },
   
   continueSection: { marginBottom: 20 },
   continueCard: { width: 140, height: 210, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.bg2 },
