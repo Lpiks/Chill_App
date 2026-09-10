@@ -2,7 +2,7 @@ import axios from 'axios';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = Constants.expoConfig?.extra?.apiUrl || 'http://192.168.100.3:5000/api';
+const API_URL = __DEV__ ? process.env.EXPO_PUBLIC_LOCAL_URL : process.env.EXPO_PUBLIC_PROD_URL;
 
 const getAuthHeaders = async () => {
   const token = await AsyncStorage.getItem('userToken');
@@ -17,6 +17,24 @@ export const searchMovies = async (query: string, type: 'movie' | 'series' = 'mo
     console.error('Search error:', error);
     return [];
   }
+};
+
+export const discover = async (params: { type: string; year?: string; language?: string; country?: string; genres?: string; page?: number }) => {
+  let url = `${API_URL}/browsing/discover?type=${params.type}`;
+  if (params.year) url += `&year=${params.year}`;
+  if (params.language) url += `&language=${params.language}`;
+  if (params.country) url += `&country=${params.country}`;
+  if (params.genres) url += `&genres=${params.genres}`;
+  if (params.page) url += `&page=${params.page}`;
+  
+  const response = await axios.get(url);
+  return response.data.map((m: any) => ({
+    ...m,
+    tmdbId: m.id,
+    type: (params.type === 'series' || params.type === 'tv') ? 'tv' : 'movie',
+    posterPath: m.poster_path,
+    score: m.vote_average
+  }));
 };
 
 export const getTrending = async (category?: string) => {

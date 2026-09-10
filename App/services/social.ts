@@ -2,7 +2,7 @@ import axios from 'axios';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = Constants.expoConfig?.extra?.apiUrl || 'http://192.168.100.3:5000/api';
+const API_URL = __DEV__ ? process.env.EXPO_PUBLIC_LOCAL_URL : process.env.EXPO_PUBLIC_PROD_URL;
 
 export const getFeed = async (page = 1) => {
   try {

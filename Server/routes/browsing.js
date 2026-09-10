@@ -23,6 +23,36 @@ router.get('/search', async (req, res) => {
   }
 });
 
+router.get('/discover', async (req, res) => {
+  const { type, year, language, country, genres, page } = req.query;
+  
+  try {
+    const tmdbType = (type === 'series' || type === 'tv') ? 'tv' : 'movie';
+    const baseUrl = `https://api.themoviedb.org/3/discover/${tmdbType}?api_key=${process.env.TMDB_API_KEY}&language=fr-FR`;
+    
+    let queryParams = `&sort_by=popularity.desc&page=${page || 1}`;
+    
+    if (year) {
+      if (tmdbType === 'movie') {
+        queryParams += `&primary_release_year=${year}`;
+      } else {
+        queryParams += `&first_air_date_year=${year}`;
+      }
+    }
+    if (language) queryParams += `&with_original_language=${language}`;
+    if (country) queryParams += `&with_origin_country=${country}`;
+    if (genres) queryParams += `&with_genres=${genres}`;
+
+    const url = baseUrl + queryParams;
+    const response = await fetch(url);
+    const data = await response.json();
+    res.json(data.results || []);
+  } catch (error) {
+    console.error('Discover error:', error);
+    res.status(500).json({ message: 'Error discovering media' });
+  }
+});
+
 // GET Progress
 router.get('/progress', auth, async (req, res) => {
   try {
