@@ -5,6 +5,11 @@ const auth = require('../middleware/auth');
 const Post = require('../models/Post');
 const Comment = require('../models/Comment');
 const Report = require('../models/Report');
+const Notification = require('../models/Notification');
+const Conversation = require('../models/Conversation');
+const Message = require('../models/Message');
+const User = require('../models/User');
+const { sendPushNotification } = require('../utils/push');
 
 // GET /api/posts - Get Feed
 router.get('/', auth, async (req, res) => {
@@ -108,6 +113,119 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
+// GET /api/posts/:id - Get Single Post
+router.get('/:id', auth, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id)
+      .populate('userId', 'name avatar username avatarUrl');
+      
+    if (!post) {
+      return res.status(404).json({ message: 'Post introuvable' });
+    }
+
+    // Add isLiked field dynamically
+    const postObj = post.toObject();
+    postObj.isLiked = post.likes.includes(req.user.id);
+    
+    // Normalize user to match feed structure
+    if (postObj.userId) {
+      postObj.user = postObj.userId;
+    }
+
+    res.json(postObj);
+  } catch (error) {
+    console.error('[GetPost] Error:', error);
+    res.status(500).json({ message: 'Erreur lors du chargement du post' });
+  }
+});
+
+// POST /api/posts/:id/share - Share Post to Friends
+router.post('/:id/share', auth, async (req, res) => {
+  try {
+    const { friendIds } = req.body;
+    if (!friendIds || !friendIds.length) {
+      return res.status(400).json({ message: 'Aucun ami sélectionné' });
+    }
+
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: 'Post introuvable' });
+
+    const io = req.app.get('io');
+    const sender = await User.findById(req.user.id);
+
+    for (let friendId of friendIds) {
+      // Find or create direct conversation
+      const allMembers = [req.user.id, friendId].sort();
+      let conversation = await Conversation.findOne({
+        type: 'direct',
+        members: { $all: allMembers, $size: 2 }
+      });
+
+      if (!conversation) {
+        conversation = new Conversation({
+          type: 'direct',
+          members: allMembers,
+          creator: req.user.id,
+          unreadCounts: allMembers.map(id => ({ userId: id, count: 0 }))
+        });
+        await conversation.save();
+      }
+
+      // Create Message
+      const message = new Message({
+        conversationId: conversation._id,
+        senderId: req.user.id,
+        type: 'post_share',
+        sharedPost: post._id,
+      });
+      await message.save();
+
+      // Update Conversation
+      await Conversation.findByIdAndUpdate(conversation._id, {
+        lastMessage: {
+          content: '🎬 Publication partagée',
+          type: 'post_share',
+          senderId: req.user.id,
+          createdAt: Date.now()
+        },
+        $inc: { 'unreadCounts.$[elem].count': 1 }
+      }, {
+        arrayFilters: [{ 'elem.userId': { $ne: req.user.id } }]
+      });
+
+      // Populate for socket
+      const populatedMessage = await Message.findById(message._id)
+        .populate('senderId', 'name avatar')
+        .populate({ path: 'sharedPost', populate: { path: 'userId', select: 'name username avatar avatarUrl' }});
+      
+      if (io) {
+        io.to(`conversation:${conversation._id}`).emit('new-message', populatedMessage);
+      }
+
+      // Notification
+      const notif = new Notification({
+        userId: friendId,
+        type: 'new_message',
+        fromUser: req.user.id,
+        data: { conversationId: conversation._id }
+      });
+      await notif.save();
+
+      await sendPushNotification(
+        friendId,
+        sender ? sender.name : 'Nouveau message',
+        '🎬 Publication partagée',
+        { type: 'new_message', conversationId: conversation._id }
+      );
+    }
+
+    res.json({ message: 'Publication partagée avec succès' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur lors du partage' });
+  }
+});
+
 // PUT /api/posts/:id - Edit Post
 router.put('/:id', auth, async (req, res) => {
   const { rating, review } = req.body;
@@ -162,6 +280,24 @@ router.post('/:id/like', auth, async (req, res) => {
     } else {
       post.likes.push(req.user.id);
       post.likesCount += 1;
+
+      // Only send notification if liking someone else's post
+      if (post.userId.toString() !== req.user.id.toString()) {
+        const notif = new Notification({
+          userId: post.userId,
+          type: 'post_like',
+          fromUser: req.user.id,
+          data: { postId: post._id, title: post.title }
+        });
+        await notif.save();
+        
+        await sendPushNotification(
+          post.userId, 
+          'Nouveau Like', 
+          `Quelqu'un a aimé votre avis sur ${post.title}`,
+          { type: 'post_like', postId: post._id }
+        );
+      }
     }
 
     await post.save();
@@ -179,7 +315,7 @@ router.get('/:id/comments', auth, async (req, res) => {
 
   try {
     const comments = await Comment.find({ postId: req.params.id })
-      .populate('userId', 'name avatar')
+      .populate('userId', 'name avatar username')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -204,12 +340,74 @@ router.post('/:id/comments', auth, async (req, res) => {
 
     await comment.save();
 
-    await Post.findByIdAndUpdate(req.params.id, { $inc: { commentsCount: 1 } });
+    const post = await Post.findByIdAndUpdate(req.params.id, { $inc: { commentsCount: 1 } });
+    const sender = await User.findById(req.user.id);
 
-    const populatedComment = await Comment.findById(comment._id).populate('userId', 'name avatar');
+    // Send Notification if commenting on someone else's post
+    if (post && post.userId.toString() !== req.user.id.toString()) {
+      const notif = new Notification({
+        userId: post.userId,
+        type: 'post_comment',
+        fromUser: req.user.id,
+        data: { postId: post._id, title: post.title }
+      });
+      await notif.save();
+      
+      await sendPushNotification(
+        post.userId, 
+        'Nouveau Commentaire', 
+        `${sender ? sender.name : "Quelqu'un"} a commenté votre avis sur ${post.title}`,
+        { type: 'post_comment', postId: post._id }
+      );
+    }
+
+    // Handle Mentions
+    const mentions = text.match(/@([\w.-]+)/g);
+    if (mentions) {
+      // Regex /@([\w.-]+)/ might miss non-ascii handle chars. We can use /@(\S+)/g, but let's just make it case-insensitive regex for the handles
+      const usernames = [...new Set(mentions.map(m => m.slice(1)))];
+      
+      // Use aggregation to find users whose name without spaces matches the handle case-insensitively
+      const mentionedUsers = await User.aggregate([
+        {
+          $addFields: {
+            strippedName: {
+              $replaceAll: { input: "$name", find: " ", replacement: "" }
+            }
+          }
+        },
+        {
+          $match: {
+            strippedName: { $in: usernames.map(u => new RegExp(`^${u}$`, 'i')) }
+          }
+        }
+      ]);
+      
+      for (const user of mentionedUsers) {
+        if (user._id.toString() !== req.user.id.toString()) {
+          const notif = new Notification({
+            userId: user._id,
+            type: 'post_mention',
+            fromUser: req.user.id,
+            data: { postId: post._id, title: post.title }
+          });
+          await notif.save();
+          
+          await sendPushNotification(
+            user._id,
+            'Nouvelle mention',
+            `${sender ? sender.name : "Quelqu'un"} vous a mentionné dans un commentaire`,
+            { type: 'post_mention', postId: post._id }
+          );
+        }
+      }
+    }
+
+    const populatedComment = await Comment.findById(comment._id).populate('userId', 'name avatar username');
     res.status(201).json(populatedComment);
   } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de l\'ajout du commentaire' });
+    console.error(error);
+    res.status(500).json({ message: "Erreur lors de l'ajout du commentaire" });
   }
 });
 

@@ -39,9 +39,25 @@ export default function UserProfileScreen() {
 
   const requestMutation = useMutation({
     mutationFn: () => api.post(`/friends/request/${userId}`),
-    onSuccess: () => {
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['profile', userId] });
+      const prevProfile = queryClient.getQueryData(['profile', userId]);
+
+      queryClient.setQueryData(['profile', userId], (old: any) => {
+        if (!old) return old;
+        return { ...old, friendshipStatus: 'pending_sent' };
+      });
+
+      return { prevProfile };
+    },
+    onError: (err, variables, context: any) => {
+      if (context?.prevProfile) {
+        queryClient.setQueryData(['profile', userId], context.prevProfile);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['profile', userId] });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      queryClient.invalidateQueries({ queryKey: ['friend-requests'] });
     }
   });
 
@@ -187,7 +203,7 @@ export default function UserProfileScreen() {
             <FlashList
               data={posts}
               renderItem={({ item }) => <PostCard post={item} />}
-              estimatedItemSize={400}
+              {...({ estimatedItemSize: 400 } as any)}
               scrollEnabled={false}
               ListEmptyComponent={
                 <View style={styles.emptyState}>

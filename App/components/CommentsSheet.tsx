@@ -1,6 +1,8 @@
-import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
-import BottomSheet, { BottomSheetFlatList, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
+import React, { useState } from 'react';
+import { 
+  View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, 
+  KeyboardAvoidingView, Platform, Modal, FlatList, TouchableWithoutFeedback, Image
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -10,9 +12,19 @@ import { colors } from '../constants/colors';
 import * as Haptics from 'expo-haptics';
 
 export const CommentsSheet = ({ post, isVisible, onClose, onAddComment }: any) => {
-  const bottomSheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => ['60%', '90%'], []);
   const [newComment, setNewComment] = useState('');
+  const [cursorPos, setCursorPos] = useState(0);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+
+  // Fetch Friends
+  const { data: friends } = useQuery({
+    queryKey: ['friends'],
+    queryFn: async () => {
+      const { data } = await api.get('/friends');
+      return data;
+    },
+    enabled: isVisible,
+  });
 
   // Fetch Comments
   const { data: comments, isLoading, refetch } = useQuery({
@@ -25,15 +37,57 @@ export const CommentsSheet = ({ post, isVisible, onClose, onAddComment }: any) =
     enabled: isVisible && !!post?._id,
   });
 
-  useEffect(() => {
-    if (isVisible) {
-      bottomSheetRef.current?.snapToIndex(0);
+  // Detect Mentions
+  React.useEffect(() => {
+    if (!newComment) {
+      setMentionQuery(null);
+      return;
     }
-  }, [isVisible]);
+    const textBeforeCursor = newComment.slice(0, cursorPos);
+    const lastAtIdx = textBeforeCursor.lastIndexOf('@');
+    if (lastAtIdx !== -1) {
+      const textAfterAt = textBeforeCursor.slice(lastAtIdx + 1);
+      if (!textAfterAt.includes(' ')) {
+        setMentionQuery(textAfterAt);
+        return;
+      }
+    }
+    setMentionQuery(null);
+  }, [newComment, cursorPos]);
 
-  const renderBackdrop = (props: any) => (
-    <BottomSheetBackdrop {...props} disappearsAt={-1} appearsAt={0.5} />
-  );
+  // Compute Suggestions
+  const suggestions = React.useMemo(() => {
+    if (mentionQuery === null) return [];
+    
+    const userMap = new Map();
+    
+    comments?.forEach((c: any) => {
+      if (c.userId && c.userId.name) userMap.set(c.userId._id, c.userId);
+    });
+    
+    friends?.forEach((f: any) => {
+      if (f.name) userMap.set(f._id || f.id, f);
+    });
+    
+    const allUsers = Array.from(userMap.values());
+    const query = mentionQuery.toLowerCase();
+    
+    return allUsers.filter(u => 
+      u.name?.toLowerCase().replace(/\s+/g, '').includes(query) || 
+      u.name?.toLowerCase().includes(query)
+    ).slice(0, 5);
+  }, [mentionQuery, comments, friends]);
+
+  const handleMentionSelect = (name: string) => {
+    const handle = name.replace(/\s+/g, '');
+    const textBeforeCursor = newComment.slice(0, cursorPos);
+    const lastAtIdx = textBeforeCursor.lastIndexOf('@');
+    const textAfterCursor = newComment.slice(cursorPos);
+    
+    const newText = newComment.slice(0, lastAtIdx) + `@${handle} ` + textAfterCursor;
+    setNewComment(newText);
+    setMentionQuery(null);
+  };
 
   const handleSend = () => {
     if (!newComment.trim()) return;
@@ -48,92 +102,167 @@ export const CommentsSheet = ({ post, isVisible, onClose, onAddComment }: any) =
     // Logic for liking a comment can be added here
   };
 
-  if (!isVisible) return null;
-
   return (
-    <BottomSheet
-      ref={bottomSheetRef}
-      index={-1}
-      snapPoints={snapPoints}
-      enablePanDownToClose
-      onClose={onClose}
-      backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: '#111118' }}
-      handleIndicatorStyle={{ backgroundColor: '#333' }}
-      keyboardBehavior="extend"
+    <Modal
+      visible={isVisible}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={onClose}
     >
       <KeyboardAvoidingView 
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        style={styles.modalOverlay}
+        behavior="padding"
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>Commentaires</Text>
-        </View>
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View style={styles.backdrop} />
+        </TouchableWithoutFeedback>
 
-        {isLoading ? (
-          <ActivityIndicator color={colors.red} style={{ marginTop: 20 }} />
-        ) : (
-          <BottomSheetFlatList
-            data={comments}
-            keyExtractor={(item) => item._id}
-            renderItem={({ item }: any) => {
-              const username = item.userId?.name || item.userId?.username || 'Utilisateur';
-              return (
-                <View style={styles.commentItem}>
-                  <View style={styles.commentAvatar}>
-                    <Text style={styles.avatarText}>{username.charAt(0).toUpperCase()}</Text>
-                  </View>
-                  <View style={styles.commentContent}>
-                    <View style={styles.commentHeader}>
-                      <Text style={styles.commentUser}>{username}</Text>
-                      <Text style={styles.commentTime}>{formatDistanceToNow(new Date(item.createdAt), { locale: fr })}</Text>
+        <View style={styles.sheetContainer}>
+          <View style={styles.header}>
+            <View style={styles.dragIndicator} />
+            <Text style={styles.title}>Commentaires</Text>
+            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+              <Ionicons name="close" size={24} color="#888" />
+            </TouchableOpacity>
+          </View>
+
+          {isLoading ? (
+            <ActivityIndicator color={colors.red} style={{ marginTop: 40 }} />
+          ) : (
+            <FlatList
+              data={comments}
+              keyExtractor={(item) => item._id}
+              renderItem={({ item }: any) => {
+                const username = item.userId?.name || item.userId?.username || 'Utilisateur';
+                return (
+                  <View style={styles.commentItem}>
+                    <View style={styles.commentAvatar}>
+                      <Text style={styles.avatarText}>{username.charAt(0).toUpperCase()}</Text>
                     </View>
-                    <Text style={styles.commentText}>{item.text}</Text>
+                    <View style={styles.commentContent}>
+                      <View style={styles.commentHeader}>
+                        <Text style={styles.commentUser}>{username}</Text>
+                        <Text style={styles.commentTime}>{formatDistanceToNow(new Date(item.createdAt), { locale: fr })}</Text>
+                      </View>
+                      <Text style={styles.commentText}>{item.text}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => handleLikeComment(item._id)} style={styles.commentLike}>
+                      <Ionicons name="heart-outline" size={16} color="#666" />
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity onPress={() => handleLikeComment(item._id)} style={styles.commentLike}>
-                    <Ionicons name="heart-outline" size={16} color="#666" />
-                  </TouchableOpacity>
+                );
+              }}
+              contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={50} color="#333" />
+                  <Text style={styles.emptyText}>Aucun commentaire pour le moment.</Text>
+                  <Text style={styles.emptySubText}>Soyez le premier à donner votre avis !</Text>
                 </View>
-              );
-            }}
-            contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Ionicons name="chatbubble-ellipses-outline" size={50} color="#333" />
-                <Text style={styles.emptyText}>Aucun commentaire pour le moment.</Text>
-                <Text style={styles.emptySubText}>Soyez le premier à donner votre avis !</Text>
-              </View>
-            }
-          />
-        )}
+              }
+            />
+          )}
 
-        <View style={styles.inputSection}>
-          <TextInput
-            style={styles.input}
-            placeholder="Écrire un commentaire..."
-            placeholderTextColor="#888"
-            value={newComment}
-            onChangeText={setNewComment}
-            multiline
-          />
-          <TouchableOpacity 
-            onPress={handleSend} 
-            style={[styles.sendBtn, !newComment.trim() && { opacity: 0.5 }]}
-            disabled={!newComment.trim()}
-          >
-            <Ionicons name="send" size={20} color={colors.red} />
-          </TouchableOpacity>
+          {/* Mentions Suggestions */}
+          {mentionQuery !== null && suggestions.length > 0 && (
+            <View style={styles.suggestionsContainer}>
+              <FlatList
+                data={suggestions}
+                keyExtractor={(item) => item._id}
+                horizontal
+                keyboardShouldPersistTaps="always"
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10, gap: 10 }}
+                renderItem={({ item }) => (
+                  <TouchableOpacity 
+                    style={styles.suggestionBadge}
+                    onPress={() => handleMentionSelect(item.name)}
+                  >
+                    {item.avatar ? (
+                      <Image source={{ uri: item.avatar.includes('http') ? item.avatar : `http://192.168.1.18:5000/uploads/avatars/${item.avatar}` }} style={styles.suggestionAvatar} />
+                    ) : (
+                      <View style={[styles.suggestionAvatar, { backgroundColor: '#333', justifyContent: 'center', alignItems: 'center' }]}>
+                        <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{item.name?.charAt(0) || '?'}</Text>
+                      </View>
+                    )}
+                    <Text style={styles.suggestionText}>{item.name}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+          )}
+
+          <View style={styles.inputSection}>
+            <TextInput
+              style={styles.input}
+              placeholder="Écrire un commentaire..."
+              placeholderTextColor="#888"
+              value={newComment}
+              onChangeText={setNewComment}
+              onSelectionChange={(e) => setCursorPos(e.nativeEvent.selection.end)}
+              multiline
+            />
+            <TouchableOpacity 
+              onPress={handleSend} 
+              style={[styles.sendBtn, !newComment.trim() && { opacity: 0.5 }]}
+              disabled={!newComment.trim()}
+            >
+              <Ionicons name="send" size={20} color={colors.red} />
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
-    </BottomSheet>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#222', alignItems: 'center' },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  sheetContainer: {
+    backgroundColor: '#111118',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    height: '85%', // Occupies 85% of screen
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.5,
+    shadowRadius: 5,
+    elevation: 10,
+  },
+  header: { 
+    padding: 16, 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#222', 
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center'
+  },
+  dragIndicator: {
+    position: 'absolute',
+    top: 8,
+    width: 40,
+    height: 4,
+    backgroundColor: '#333',
+    borderRadius: 2,
+    alignSelf: 'center'
+  },
   title: { color: '#f0f0f0', fontSize: 18, fontWeight: 'bold' },
+  closeBtn: {
+    position: 'absolute',
+    right: 16,
+    padding: 4
+  },
   commentItem: { flexDirection: 'row', gap: 12, marginBottom: 20 },
   commentAvatar: { 
     width: 32, 
@@ -173,5 +302,31 @@ const styles = StyleSheet.create({
   emptyContainer: { alignItems: 'center', marginTop: 60, gap: 10 },
   emptyText: { color: '#888', fontWeight: '600', fontSize: 16 },
   emptySubText: { color: '#555', fontSize: 14 },
+  suggestionsContainer: {
+    backgroundColor: '#1a1a24',
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+    maxHeight: 60,
+  },
+  suggestionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a2a36',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#444'
+  },
+  suggestionAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginRight: 8
+  },
+  suggestionText: {
+    color: '#f0f0f0',
+    fontSize: 13,
+    fontWeight: '600'
+  }
 });
-

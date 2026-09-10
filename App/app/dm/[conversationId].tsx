@@ -222,6 +222,33 @@ export default function ChatScreen() {
               </View>
             </TouchableOpacity>
           )}
+          {(item.type as any) === 'post_share' && (item as any).sharedPost && (
+            <TouchableOpacity 
+              style={styles.mediaCard}
+              onPress={() => router.push(`/post/${(item as any).sharedPost._id}`)}
+            >
+              <Image source={{ uri: `https://image.tmdb.org/t/p/w200${(item as any).sharedPost.posterPath}` }} style={styles.mediaPoster} />
+              <View style={styles.mediaInfo}>
+                <Text style={styles.mediaTitle} numberOfLines={1}>{(item as any).sharedPost.title}</Text>
+                <Text style={styles.mediaSub}>{(item as any).sharedPost.year} • ⭐ {(item as any).sharedPost.rating?.toFixed(1)}</Text>
+                
+                <View style={styles.sharedPostUser}>
+                  {((item as any).sharedPost.userId?.avatar || (item as any).sharedPost.userId?.avatarUrl) ? (
+                    <Image source={{ uri: (item as any).sharedPost.userId?.avatarUrl || (item as any).sharedPost.userId?.avatar }} style={styles.sharedPostAvatar} />
+                  ) : (
+                    <View style={styles.sharedPostAvatarFallback}>
+                      <Text style={styles.sharedPostAvatarText}>
+                        {((item as any).sharedPost.userId?.name || 'A').charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={styles.sharedPostUsername} numberOfLines={1}>Avis de {(item as any).sharedPost.userId?.name}</Text>
+                </View>
+
+                <Text style={styles.mediaLink}>Voir la publication</Text>
+              </View>
+            </TouchableOpacity>
+          )}
           <View style={styles.bubbleFooter}>
             <Text style={styles.msgTime}>{format(new Date(item.createdAt), 'HH:mm')}</Text>
             {isMe && (
@@ -407,4 +434,9 @@ const styles = StyleSheet.create({
   mediaTitle: { color: 'white', fontWeight: 'bold', fontSize: 14 },
   mediaSub: { color: '#757575', fontSize: 12, marginTop: 2 },
   mediaLink: { color: colors.red, fontSize: 12, fontWeight: 'bold', marginTop: 8 },
+  sharedPostUser: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 6 },
+  sharedPostAvatar: { width: 16, height: 16, borderRadius: 8 },
+  sharedPostAvatarFallback: { width: 16, height: 16, borderRadius: 8, backgroundColor: colors.red, justifyContent: 'center', alignItems: 'center' },
+  sharedPostAvatarText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
+  sharedPostUsername: { color: 'white', fontSize: 12, flex: 1 }
 });

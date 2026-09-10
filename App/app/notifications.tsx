@@ -31,8 +31,34 @@ export default function NotificationsScreen() {
     }
   });
 
+  const markSingleReadMutation = useMutation({
+    mutationFn: (notifId: string) => api.put(`/notifications/${notifId}/read`),
+    onMutate: async (notifId) => {
+      await queryClient.cancelQueries({ queryKey: ['notifications'] });
+      const prevNotifs = queryClient.getQueryData(['notifications']);
+      
+      queryClient.setQueryData(['notifications'], (old: any) => {
+        if (!old) return old;
+        return old.map((n: any) => n._id === notifId ? { ...n, read: true } : n);
+      });
+      return { prevNotifs };
+    },
+    onError: (err, variables, context: any) => {
+      if (context?.prevNotifs) {
+        queryClient.setQueryData(['notifications'], context.prevNotifs);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    }
+  });
+
   const handleNotificationPress = (notif: any) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    if (!notif.read) {
+      markSingleReadMutation.mutate(notif._id);
+    }
     
     // Navigate based on type
     switch (notif.type) {
@@ -44,6 +70,7 @@ export default function NotificationsScreen() {
         break;
       case 'post_like':
       case 'post_comment':
+      case 'post_mention':
         // Assuming we can navigate to a single post view or the feed
         router.push('/(tabs)/feed');
         break;
@@ -76,6 +103,10 @@ export default function NotificationsScreen() {
       case 'post_comment':
         iconName = 'chatbubble-outline';
         iconColor = colors.white;
+        break;
+      case 'post_mention':
+        iconName = 'at';
+        iconColor = '#3b82f6'; // Blue
         break;
       case 'system_alert':
         iconName = 'alert-circle';
@@ -132,6 +163,7 @@ export default function NotificationsScreen() {
             {item.type === 'request_accepted' && ' a accepté votre demande d\'ami'}
             {item.type === 'post_like' && ' a aimé votre post'}
             {item.type === 'post_comment' && ' a commenté votre post'}
+            {item.type === 'post_mention' && ' vous a mentionné dans un commentaire'}
             {item.type === 'watch_party_invite' && ' vous a invité à une Watch Party'}
             {item.type === 'new_message' && ' vous a envoyé un message'}
             {item.type === 'system_alert' && (item.data?.message ? `: ${item.data.message}` : ' a envoyé une annonce système')}

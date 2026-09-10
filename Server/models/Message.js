@@ -3,10 +3,11 @@ const mongoose = require('mongoose');
 const messageSchema = new mongoose.Schema({
   conversationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Conversation', required: true },
   senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  type: { type: String, enum: ['text', 'voice', 'media'], default: 'text' },
+  type: { type: String, enum: ['text', 'voice', 'media', 'post_share'], default: 'text' },
   content: String,                        // text content
   mediaUrl: String,                       // Cloudinary URL for voice
   duration: Number,                       // voice message duration in seconds
+  sharedPost: { type: mongoose.Schema.Types.ObjectId, ref: 'Post' }, // For shared posts
   tmdbData: {                             // for movie/series card
     tmdbId: Number,
     mediaType: String,

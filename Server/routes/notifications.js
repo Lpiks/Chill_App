@@ -27,4 +27,17 @@ router.put('/read', auth, async (req, res) => {
   }
 });
 
+// PUT /api/notifications/:id/read - Mark single notification as read
+router.put('/:id/read', auth, async (req, res) => {
+  try {
+    await Notification.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user.id },
+      { read: true }
+    );
+    res.json({ message: 'Notification marquée comme lue' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;

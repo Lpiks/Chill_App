@@ -118,6 +118,10 @@ router.get('/:id/messages', auth, async (req, res) => {
     const { page = 1, limit = 30 } = req.query;
     const messages = await Message.find({ conversationId: req.params.id })
       .populate('senderId', 'name avatar')
+      .populate({
+        path: 'sharedPost',
+        populate: { path: 'userId', select: 'name username avatar avatarUrl' }
+      })
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit);

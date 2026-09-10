@@ -14,13 +14,15 @@ router.get('/', auth, async (req, res) => {
         { requester: req.user.id, status: 'accepted' },
         { recipient: req.user.id, status: 'accepted' }
       ]
-    }).populate('requester recipient', 'name avatar lastSeen');
+    }).populate('requester recipient', 'name avatar lastSeen username');
 
     const friends = friendships.map(f => {
       const friend = f.requester._id.toString() === req.user.id ? f.recipient : f.requester;
       return {
         id: friend._id,
+        _id: friend._id,
         name: friend.name,
+        username: friend.username,
         avatar: friend.avatar,
         lastSeen: friend.lastSeen,
         friendshipId: f._id
@@ -117,6 +119,13 @@ router.put('/request/:requestId/accept', auth, async (req, res) => {
     friendship.updatedAt = Date.now();
     await friendship.save();
 
+    // Remove the pending friend request notification
+    await Notification.deleteMany({
+      userId: req.user.id,
+      fromUser: friendship.requester,
+      type: 'friend_request'
+    });
+
     // Notification to requester
     const recipient = await User.findById(req.user.id);
     const notification = new Notification({
@@ -153,6 +162,13 @@ router.delete('/request/:requestId/decline', auth, async (req, res) => {
       return res.status(404).json({ message: 'Demande non trouvée' });
     }
 
+    // Remove the pending friend request notification
+    await Notification.deleteMany({
+      userId: req.user.id,
+      fromUser: friendship.requester,
+      type: 'friend_request'
+    });
+
     res.json({ message: 'Demande refusée' });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -171,6 +187,13 @@ router.delete('/request/:requestId/cancel', auth, async (req, res) => {
     if (!friendship) {
       return res.status(404).json({ message: 'Demande non trouvée' });
     }
+
+    // Remove the pending friend request notification from the recipient
+    await Notification.deleteMany({
+      userId: friendship.recipient,
+      fromUser: req.user.id,
+      type: 'friend_request'
+    });
 
     res.json({ message: 'Demande annulée' });
   } catch (error) {

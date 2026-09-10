@@ -35,10 +35,41 @@ export default function FindFriendsScreen() {
 
   const requestMutation = useMutation({
     mutationFn: (userId: string) => api.post(`/friends/request/${userId}`),
-    onSuccess: () => {
+    onMutate: async (userId) => {
+      await queryClient.cancelQueries({ queryKey: ['user-search'] });
+      await queryClient.cancelQueries({ queryKey: ['user-suggestions'] });
+
+      const prevSearch = queryClient.getQueryData(['user-search', searchQuery]);
+      const prevSuggestions = queryClient.getQueryData(['user-suggestions']);
+
+      queryClient.setQueryData(['user-search', searchQuery], (old: any) => {
+        if (!old) return old;
+        return old.map((u: any) => 
+          (u._id === userId || u.id === userId) ? { ...u, friendshipStatus: 'pending_sent' } : u
+        );
+      });
+
+      queryClient.setQueryData(['user-suggestions'], (old: any) => {
+        if (!old) return old;
+        return old.map((u: any) => 
+          (u._id === userId || u.id === userId) ? { ...u, friendshipStatus: 'pending_sent' } : u
+        );
+      });
+
+      return { prevSearch, prevSuggestions, searchQuery };
+    },
+    onError: (err, userId, context: any) => {
+      if (context?.prevSearch) {
+        queryClient.setQueryData(['user-search', context.searchQuery], context.prevSearch);
+      }
+      if (context?.prevSuggestions) {
+        queryClient.setQueryData(['user-suggestions'], context.prevSuggestions);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['user-search'] });
+      queryClient.invalidateQueries({ queryKey: ['user-suggestions'] });
       queryClient.invalidateQueries({ queryKey: ['friend-requests'] });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   });
 

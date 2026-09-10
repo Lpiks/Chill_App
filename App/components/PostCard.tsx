@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Share, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -12,6 +12,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import { showToast } from '../utils/toast';
 import { useAuthStore } from '../store/authStore';
+import { useQuery } from '@tanstack/react-query';
 
 interface PostCardProps {
   post: any;
@@ -25,6 +26,18 @@ export const PostCard = ({ post, onCommentPress }: PostCardProps) => {
   
   const [isReportModalVisible, setIsReportModalVisible] = useState(false);
   const [isManageModalVisible, setIsManageModalVisible] = useState(false);
+  const [isShareModalVisible, setIsShareModalVisible] = useState(false);
+  const [sentFriends, setSentFriends] = useState<string[]>([]);
+
+  // Fetch Friends
+  const { data: friends } = useQuery({
+    queryKey: ['friends'],
+    queryFn: async () => {
+      const res = await api.get('/friends');
+      return res.data;
+    },
+    enabled: isShareModalVisible // Only fetch if modal is open
+  });
 
   const isMyPost = post?.user?._id === user?.id || post?.userId?._id === user?.id || post?.userId === user?.id;
 
@@ -69,6 +82,7 @@ export const PostCard = ({ post, onCommentPress }: PostCardProps) => {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['post', post._id] });
     }
   });
 
@@ -77,14 +91,21 @@ export const PostCard = ({ post, onCommentPress }: PostCardProps) => {
     likeMutation.mutate(post._id);
   };
 
-  const handleShare = async () => {
+  const handleShare = () => {
+    setIsShareModalVisible(true);
+    setSentFriends([]); // reset
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const sendToFriend = async (friendId: string) => {
     try {
-      await Share.share({
-        message: `Regarde l'avis de ${post.user?.name || post.userId?.username} sur ${post.title} sur Cinedz !`,
-        url: `https://cinedz.dz/post/${post._id}`
-      });
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setSentFriends(prev => [...prev, friendId]);
+      await api.post(`/posts/${post._id}/share`, { friendIds: [friendId] });
+      showToast('success', 'Envoyé', 'Publication partagée avec succès');
     } catch (error) {
-      console.error(error);
+      showToast('error', 'Erreur', 'Impossible de partager');
+      setSentFriends(prev => prev.filter(id => id !== friendId));
     }
   };
 
@@ -299,6 +320,59 @@ export const PostCard = ({ post, onCommentPress }: PostCardProps) => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Custom Share Action Sheet */}
+      <Modal
+        visible={isShareModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsShareModalVisible(false)}
+      >
+        <TouchableOpacity style={[styles.modalOverlay, { justifyContent: 'flex-end' }]} activeOpacity={1} onPress={() => setIsShareModalVisible(false)}>
+          <View style={[styles.actionSheet, { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, maxHeight: '80%' }]} onStartShouldSetResponder={() => true}>
+            <View style={styles.shareHeader}>
+              <Text style={styles.actionSheetTitle}>Partager avec...</Text>
+              <TouchableOpacity onPress={() => setIsShareModalVisible(false)}>
+                <Ionicons name="close" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 300 }} contentContainerStyle={{ paddingBottom: 20 }}>
+              {friends?.length === 0 ? (
+                <Text style={styles.noFriendsText}>Vous n'avez pas encore d'amis à qui partager.</Text>
+              ) : (
+                friends?.map((friend: any) => {
+                  const isSent = sentFriends.includes(friend.id || friend._id);
+                  return (
+                    <View key={friend.id || friend._id} style={styles.friendRow}>
+                      <View style={styles.friendInfo}>
+                        <View style={styles.friendAvatar}>
+                          {friend.avatar || friend.avatarUrl ? (
+                            <Image source={{ uri: friend.avatar || friend.avatarUrl }} style={{ width: '100%', height: '100%', borderRadius: 20 }} />
+                          ) : (
+                            <Text style={styles.friendAvatarText}>{friend.name.charAt(0).toUpperCase()}</Text>
+                          )}
+                        </View>
+                        <Text style={styles.friendName}>{friend.name}</Text>
+                      </View>
+                      
+                      <TouchableOpacity 
+                        style={[styles.sendBtn, isSent && styles.sentBtn]} 
+                        onPress={() => sendToFriend(friend.id || friend._id)}
+                        disabled={isSent}
+                      >
+                        <Text style={[styles.sendBtnText, isSent && styles.sentBtnText]}>
+                          {isSent ? 'Envoyé' : 'Envoyer'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </TouchableOpacity>
   );
 };
@@ -399,6 +473,43 @@ const styles = StyleSheet.create({
     color: colors.red,
     fontSize: 16,
     fontWeight: 'bold'
-  }
+  },
+  shareHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20
+  },
+  friendRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15
+  },
+  friendInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+  friendAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.red,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  friendAvatarText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+  friendName: { color: 'white', fontSize: 16, fontWeight: '600' },
+  sendBtn: {
+    backgroundColor: colors.red,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20
+  },
+  sendBtnText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+  sentBtn: { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  sentBtnText: { color: 'rgba(255,255,255,0.6)' },
+  noFriendsText: { color: colors.muted, textAlign: 'center', marginTop: 20, marginBottom: 20 }
 });
 
