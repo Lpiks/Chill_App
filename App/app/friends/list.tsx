@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,29 +24,6 @@ export default function FriendsListScreen() {
       return res.data;
     }
   });
-
-  const unfriendMutation = useMutation({
-    mutationFn: (userId: string) => api.delete(`/friends/${userId}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['friends'] });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    }
-  });
-
-  const handleUnfriend = (user: any) => {
-    Alert.alert(
-      'Retirer de vos amis',
-      `Voulez-vous vraiment retirer ${user.name} de vos amis ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { 
-          text: 'Retirer', 
-          style: 'destructive', 
-          onPress: () => unfriendMutation.mutate(user.id) 
-        }
-      ]
-    );
-  };
 
   const filteredFriends = friends?.filter((f: any) => 
     f.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -76,30 +53,17 @@ export default function FriendsListScreen() {
       <View style={styles.actions}>
         <TouchableOpacity 
           style={styles.actionBtn}
-          onPress={() => {
+          onPress={async () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push(`/dm/${item.id}`);
+            try {
+              const res = await api.post('/conversations', { memberIds: [item.id] });
+              router.push(`/dm/${res.data._id || res.data.id}`);
+            } catch (error) {
+              console.error('Error opening DM:', error);
+            }
           }}
         >
           <Ionicons name="chatbubble-outline" size={20} color="white" />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.actionBtn}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push(`/party/new?friendId=${item.id}`);
-          }}
-        >
-          <Ionicons name="film-outline" size={20} color="white" />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.actionBtn}
-          onLongPress={() => handleUnfriend(item)}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          }}
-        >
-          <Ionicons name="ellipsis-vertical" size={20} color={colors.muted} />
         </TouchableOpacity>
       </View>
     </View>

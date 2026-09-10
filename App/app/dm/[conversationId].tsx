@@ -342,11 +342,10 @@ export default function ChatScreen() {
             </TouchableOpacity>
           ) : (
             <TouchableOpacity 
-              style={[styles.micBtn, isRecording && styles.micBtnActive]}
-              onPressIn={startRecording}
-              onPressOut={stopRecording}
+              style={styles.micBtn}
+              onPress={() => alert('Les messages vocaux seront disponibles demain !')}
             >
-              <Ionicons name={isRecording ? "mic" : "mic-outline"} size={26} color="white" />
+              <Ionicons name="mic-outline" size={26} color="white" />
             </TouchableOpacity>
           )}
         </View>
