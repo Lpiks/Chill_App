@@ -70,6 +70,38 @@ export default function WatchScreen() {
     }
   };
 
+  // Server-Side Extractor Effect
+  useEffect(() => {
+    if (isExtracting && !finalStreamUrl) {
+      const fetchStream = async () => {
+        try {
+          const res = await api.get('/stealth', {
+            params: {
+              tmdbId: id,
+              type: type,
+              season: season,
+              episode: episode,
+              provider: provider
+            }
+          });
+          if (res.data && res.data.success) {
+            handleExtractionSuccess(res.data.streamUrl);
+            if (res.data.subtitles) {
+              handleSubtitlesExtracted(res.data.subtitles);
+            }
+          } else {
+            handleExtractionError();
+          }
+        } catch (err) {
+          console.error('Server extraction error', err);
+          handleExtractionError();
+        }
+      };
+      fetchStream();
+    }
+  }, [isExtracting, finalStreamUrl, id, type, season, episode, provider]);
+
+
   // Fetch TMDB Details to get IMDB ID
   const { data: tmdbDetails } = useQuery({
     queryKey: ['details', id, type],
@@ -189,12 +221,13 @@ export default function WatchScreen() {
           
           <View style={styles.loaderContent}>
             <ActivityIndicator size="large" color={colors.red} />
-            <Text style={styles.loaderText}>Recherche du flux (Client-Side)...</Text>
+            <Text style={styles.loaderText}>Recherche du flux (Server-Side)...</Text>
             <Text style={styles.loaderSubText}>{title} ({provider.toUpperCase()})</Text>
           </View>
         </View>
       ) : null}
 
+      {/* 
       {isExtracting && !finalStreamUrl && (
         <ClientSideExtractor
           tmdbId={id as string}
@@ -207,12 +240,13 @@ export default function WatchScreen() {
           onSubtitlesExtracted={handleSubtitlesExtracted}
         />
       )}
+      */}
 
       {extractionFailed && !finalStreamUrl && (
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={80} color={colors.red} />
           <Text style={styles.errorTitle}>Flux introuvable</Text>
-          <Text style={styles.errorSub}>L'extracteur client n'a pas pu trouver le flux vidéo sur {provider.toUpperCase()}.</Text>
+          <Text style={styles.errorSub}>L'extracteur serveur n'a pas pu trouver le flux vidéo sur {provider.toUpperCase()}.</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => { setExtractionFailed(false); setIsExtracting(true); }}>
             <Text style={styles.retryText}>Réessayer</Text>
           </TouchableOpacity>

@@ -8,14 +8,32 @@ const AdblockerPlugin = require('puppeteer-extra-plugin-adblocker');
 puppeteer.use(StealthPlugin());
 puppeteer.use(AdblockerPlugin({ blockTrackers: true }));
 
-const getVidLinkUrl = (tmdbId, type, season, episode) => {
-  const isTv = type === 'tv' || type === 'series';
-  return `https://vidlink.pro/${isTv ? 'tv' : 'movie'}/${tmdbId}${isTv ? `/${season}/${episode}` : ''}`;
-};
-
-const getVidSrcUrl = (tmdbId, type, season, episode) => {
-  const isTv = type === 'tv' || type === 'series';
-  return `https://vidsrc.to/embed/${isTv ? 'tv' : 'movie'}/${tmdbId}${isTv ? `/${season}/${episode}` : ''}`;
+const getEmbedUrl = (tmdbId, type, season, episode, provider) => {
+  const isMovie = type === 'movie';
+  if (provider === 'vidlink') {
+    return isMovie
+      ? `https://vidlink.pro/movie/${tmdbId}`
+      : `https://vidlink.pro/tv/${tmdbId}/${season}/${episode}`;
+  } else if (provider === 'embed.su') {
+    return isMovie
+      ? `https://embed.su/embed/movie/${tmdbId}`
+      : `https://embed.su/embed/tv/${tmdbId}/${season}/${episode}`;
+  } else if (provider === 'vidsrc.me') {
+    return isMovie
+      ? `https://vidsrc.me/embed/movie?tmdb=${tmdbId}`
+      : `https://vidsrc.me/embed/tv?tmdb=${tmdbId}&season=${season}&episode=${episode}`;
+  } else if (provider === 'vidsrc.pro') {
+    return isMovie
+      ? `https://vidsrc.pro/embed/movie/${tmdbId}`
+      : `https://vidsrc.pro/embed/tv/${tmdbId}/${season}/${episode}`;
+  } else if (provider === 'superembed.stream') {
+    return isMovie
+      ? `https://superembed.stream/movie/${tmdbId}`
+      : `https://superembed.stream/tv/${tmdbId}?s=${season}&e=${episode}`;
+  }
+  return isMovie
+    ? `https://vidlink.pro/movie/${tmdbId}`
+    : `https://vidlink.pro/tv/${tmdbId}/${season}/${episode}`;
 };
 
 // @route   GET /api/stealth
@@ -26,10 +44,7 @@ router.get('/', async (req, res) => {
     return res.status(400).json({ error: 'Missing parameters' });
   }
 
-  let targetUrl = getVidLinkUrl(tmdbId, type, season, episode);
-  if (provider === 'vidsrc') {
-    targetUrl = getVidSrcUrl(tmdbId, type, season, episode);
-  }
+  const targetUrl = getEmbedUrl(tmdbId, type, season, episode, provider);
 
   console.log(`[Stealth Extractor] Starting Puppeteer for: ${targetUrl}`);
 
