@@ -8,32 +8,14 @@ const AdblockerPlugin = require('puppeteer-extra-plugin-adblocker');
 puppeteer.use(StealthPlugin());
 puppeteer.use(AdblockerPlugin({ blockTrackers: true }));
 
-const getEmbedUrl = (tmdbId, type, season, episode, provider) => {
-  const isMovie = type === 'movie';
-  if (provider === 'vidlink') {
-    return isMovie
-      ? `https://vidlink.pro/movie/${tmdbId}`
-      : `https://vidlink.pro/tv/${tmdbId}/${season}/${episode}`;
-  } else if (provider === 'embed.su') {
-    return isMovie
-      ? `https://embed.su/embed/movie/${tmdbId}`
-      : `https://embed.su/embed/tv/${tmdbId}/${season}/${episode}`;
-  } else if (provider === 'vidsrc.me') {
-    return isMovie
-      ? `https://vidsrc.me/embed/movie?tmdb=${tmdbId}`
-      : `https://vidsrc.me/embed/tv?tmdb=${tmdbId}&season=${season}&episode=${episode}`;
-  } else if (provider === 'vidsrc.pro') {
-    return isMovie
-      ? `https://vidsrc.pro/embed/movie/${tmdbId}`
-      : `https://vidsrc.pro/embed/tv/${tmdbId}/${season}/${episode}`;
-  } else if (provider === 'superembed.stream') {
-    return isMovie
-      ? `https://superembed.stream/movie/${tmdbId}`
-      : `https://superembed.stream/tv/${tmdbId}?s=${season}&e=${episode}`;
-  }
-  return isMovie
-    ? `https://vidlink.pro/movie/${tmdbId}`
-    : `https://vidlink.pro/tv/${tmdbId}/${season}/${episode}`;
+const getVidLinkUrl = (tmdbId, type, season, episode) => {
+  const isTv = type === 'tv' || type === 'series';
+  return `https://vidlink.pro/${isTv ? 'tv' : 'movie'}/${tmdbId}${isTv ? `/${season}/${episode}` : ''}`;
+};
+
+const getVidSrcUrl = (tmdbId, type, season, episode) => {
+  const isTv = type === 'tv' || type === 'series';
+  return `https://vidsrc.to/embed/${isTv ? 'tv' : 'movie'}/${tmdbId}${isTv ? `/${season}/${episode}` : ''}`;
 };
 
 // @route   GET /api/stealth
@@ -44,7 +26,10 @@ router.get('/', async (req, res) => {
     return res.status(400).json({ error: 'Missing parameters' });
   }
 
-  const targetUrl = getEmbedUrl(tmdbId, type, season, episode, provider);
+  let targetUrl = getVidLinkUrl(tmdbId, type, season, episode);
+  if (provider === 'vidsrc') {
+    targetUrl = getVidSrcUrl(tmdbId, type, season, episode);
+  }
 
   console.log(`[Stealth Extractor] Starting Puppeteer for: ${targetUrl}`);
 
@@ -61,10 +46,10 @@ router.get('/', async (req, res) => {
     });
 
     const page = await browser.newPage();
-    
+
     // Set explicit viewport so mouse clicks work
     await page.setViewport({ width: 1280, height: 720 });
-    
+
     // Set a solid User Agent
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
@@ -84,7 +69,7 @@ router.get('/', async (req, res) => {
     page.on('request', (request) => {
       const url = request.url();
       const resourceType = request.resourceType();
-      
+
       // Log fetch/xhr to see what Vidlink is actually requesting
       if (resourceType === 'fetch' || resourceType === 'xhr') {
         if (!url.includes('google') && !url.includes('analytics') && !url.includes('ad')) {
@@ -109,14 +94,14 @@ router.get('/', async (req, res) => {
           return;
         }
       }
-      
+
       request.continue();
     });
 
     // Intercept responses to catch hidden APIs and Subtitle JSONs
     page.on('response', async (response) => {
       const url = response.url();
-      
+
       // Catch secret APIs for m3u8
       if (url.includes('vsembed.ru/vs_src.php')) {
         try {
@@ -124,10 +109,10 @@ router.get('/', async (req, res) => {
           const text = await response.text();
           const match = text.match(/https?:\/\/[^\s"'<>]+\.(m3u8|mpd)/);
           if (match && !streamUrl) {
-             streamUrl = match[0];
-             console.log(`[Stealth Extractor] CAUGHT STREAM FROM API: ${streamUrl}`);
+            streamUrl = match[0];
+            console.log(`[Stealth Extractor] CAUGHT STREAM FROM API: ${streamUrl}`);
           }
-        } catch (e) {}
+        } catch (e) { }
       }
 
       // Catch subtitle JSON responses
@@ -137,7 +122,7 @@ router.get('/', async (req, res) => {
           const text = await response.text();
           if (text.includes('.vtt') || text.includes('.srt')) {
             const data = JSON.parse(text);
-            
+
             const searchForTracks = (obj) => {
               if (!obj || typeof obj !== 'object') return;
               if (Array.isArray(obj)) {
@@ -152,7 +137,7 @@ router.get('/', async (req, res) => {
                 Object.values(obj).forEach(searchForTracks);
               }
             };
-            
+
             searchForTracks(data);
           } else if (text.includes('"tracks"') || text.includes('"subtitles"')) {
             console.log(`[Subtitle Debug] Found tracks keyword in API: ${url}`);
@@ -161,10 +146,10 @@ router.get('/', async (req, res) => {
             const vttRegex = /https?:\/\/[^\s"'<>]+\.(vtt|srt)/gi;
             let vttMatch;
             while ((vttMatch = vttRegex.exec(text)) !== null) {
-               addSubtitle(vttMatch[0], 'Auto ' + extractedSubtitles.length, 'auto' + extractedSubtitles.length);
+              addSubtitle(vttMatch[0], 'Auto ' + extractedSubtitles.length, 'auto' + extractedSubtitles.length);
             }
           }
-        } catch (e) {}
+        } catch (e) { }
       }
     });
 
@@ -181,7 +166,7 @@ router.get('/', async (req, res) => {
     // If we haven't found it yet, try clicking play buttons on the page and inside iframes
     if (!streamUrl) {
       console.log(`[Stealth Extractor] Attempting to click play buttons...`);
-      
+
       const clickPlay = async (frame) => {
         try {
           await frame.evaluate(() => {
@@ -220,7 +205,7 @@ router.get('/', async (req, res) => {
         try {
           return await frame.evaluate(() => {
             let tracks = [];
-            
+
             // 1. Check DOM tracks
             document.querySelectorAll('track').forEach(t => {
               if (t.src) {
@@ -250,9 +235,9 @@ router.get('/', async (req, res) => {
                     });
                   }
                 }
-              } catch(e) {}
+              } catch (e) { }
             }
-            
+
             // 3. Search window object for anything resembling tracks or subtitles
             try {
               const searchObj = (obj, depth = 0) => {
@@ -262,11 +247,11 @@ router.get('/', async (req, res) => {
                     if (Array.isArray(val)) {
                       val.forEach(v => {
                         if (v && v.file && typeof v.file === 'string' && (v.file.includes('.vtt') || v.file.includes('.srt'))) {
-                           tracks.push({
-                             url: v.file,
-                             label: v.label || 'Unknown',
-                             lang: v.srclang || (v.label && v.label.substring(0, 2).toLowerCase()) || 'unk'
-                           });
+                          tracks.push({
+                            url: v.file,
+                            label: v.label || 'Unknown',
+                            lang: v.srclang || (v.label && v.label.substring(0, 2).toLowerCase()) || 'unk'
+                          });
                         }
                       });
                     }
@@ -276,18 +261,18 @@ router.get('/', async (req, res) => {
               };
               if (window.__NUXT__) searchObj(window.__NUXT__);
               if (window.config) searchObj(window.config);
-            } catch(e) {}
+            } catch (e) { }
 
             return tracks;
           });
-        } catch(e) {
+        } catch (e) {
           return [];
         }
       };
 
       // Extract from main frame
       let allTracks = await getTracksFromFrame(page.mainFrame());
-      
+
       // Extract from all child iframes
       for (const frame of page.frames()) {
         const frameTracks = await getTracksFromFrame(frame);
@@ -301,9 +286,9 @@ router.get('/', async (req, res) => {
       const regex = /\{[^}]*?(file|src)["']?\s*:\s*["']([^"']+?\.(vtt|srt))[^}]*?label["']?\s*:\s*["']([^"']+)["']/gi;
       let match;
       while ((match = regex.exec(html)) !== null) {
-         addSubtitle(match[2], match[4], match[4].substring(0, 2).toLowerCase());
+        addSubtitle(match[2], match[4], match[4].substring(0, 2).toLowerCase());
       }
-    } catch(e) {}
+    } catch (e) { }
 
     if (streamUrl) {
       console.log(`[Stealth Extractor] Success! Found ${extractedSubtitles.length} subtitles.`);

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ActivityIndicator, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
   TouchableOpacity,
   ImageBackground,
   ScrollView,
@@ -27,13 +27,13 @@ export default function WatchScreen() {
   const { id, type, season, episode, title, posterPath } = useLocalSearchParams();
   const router = useRouter();
   const [currentTime, setCurrentTime] = useState(0);
-  const [provider, setProvider] = useState('vidlink'); 
-  const [hasStarted, setHasStarted] = useState(false); 
+  const [provider, setProvider] = useState('vidlink');
+  const [hasStarted, setHasStarted] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionFailed, setExtractionFailed] = useState(false);
   const [finalStreamUrl, setFinalStreamUrl] = useState<string | null>(null);
   const [isPlayerFullscreen, setIsPlayerFullscreen] = useState(false);
-  
+
   // Subtitle states
   const [vidlinkSubtitles, setVidlinkSubtitles] = useState<SubtitleTrack[]>([]);
 
@@ -44,7 +44,7 @@ export default function WatchScreen() {
     setFinalStreamUrl(null);
     setExtractionFailed(false);
     // If we have already clicked play (hasStarted is true), automatically start extracting the next episode
-    setIsExtracting(hasStarted); 
+    setIsExtracting(hasStarted);
     setVidlinkSubtitles([]);
   }, [provider, id, season, episode]);
 
@@ -69,38 +69,6 @@ export default function WatchScreen() {
       setVidlinkSubtitles(subs as SubtitleTrack[]);
     }
   };
-
-  // Server-Side Extractor Effect
-  useEffect(() => {
-    if (isExtracting && !finalStreamUrl) {
-      const fetchStream = async () => {
-        try {
-          const res = await api.get('/stealth', {
-            params: {
-              tmdbId: id,
-              type: type,
-              season: season,
-              episode: episode,
-              provider: provider
-            }
-          });
-          if (res.data && res.data.success) {
-            handleExtractionSuccess(res.data.streamUrl);
-            if (res.data.subtitles) {
-              handleSubtitlesExtracted(res.data.subtitles);
-            }
-          } else {
-            handleExtractionError();
-          }
-        } catch (err) {
-          console.error('Server extraction error', err);
-          handleExtractionError();
-        }
-      };
-      fetchStream();
-    }
-  }, [isExtracting, finalStreamUrl, id, type, season, episode, provider]);
-
 
   // Fetch TMDB Details to get IMDB ID
   const { data: tmdbDetails } = useQuery({
@@ -158,7 +126,7 @@ export default function WatchScreen() {
           timestamp: time,
           duration: videoDuration
         });
-      } catch (err) {}
+      } catch (err) { }
     };
 
     const interval = setInterval(saveProgress, 10000); // 10s for quicker updates
@@ -179,8 +147,8 @@ export default function WatchScreen() {
     <View style={styles.providerContainer}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20 }}>
         {PROVIDERS.map(p => (
-          <TouchableOpacity 
-            key={p} 
+          <TouchableOpacity
+            key={p}
             style={[styles.providerBtn, provider === p && styles.providerBtnActive]}
             onPress={() => setProvider(p)}
           >
@@ -195,11 +163,11 @@ export default function WatchScreen() {
 
   return (
     <View style={styles.container}>
-      
+
       {!hasStarted && !finalStreamUrl ? (
         <View style={styles.prePlayContainer}>
-          <ImageBackground 
-            source={{ uri: `https://image.tmdb.org/t/p/w500${posterPath}` }} 
+          <ImageBackground
+            source={{ uri: `https://image.tmdb.org/t/p/w500${posterPath}` }}
             style={StyleSheet.absoluteFill}
             blurRadius={2}
           >
@@ -211,23 +179,22 @@ export default function WatchScreen() {
         </View>
       ) : isExtracting && !finalStreamUrl ? (
         <View style={styles.loaderContainer}>
-          <ImageBackground 
-            source={{ uri: `https://image.tmdb.org/t/p/w500${posterPath}` }} 
+          <ImageBackground
+            source={{ uri: `https://image.tmdb.org/t/p/w500${posterPath}` }}
             style={StyleSheet.absoluteFill}
             blurRadius={10}
           >
             <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
           </ImageBackground>
-          
+
           <View style={styles.loaderContent}>
             <ActivityIndicator size="large" color={colors.red} />
-            <Text style={styles.loaderText}>Recherche du flux (Server-Side)...</Text>
+            <Text style={styles.loaderText}>Recherche du flux (Client-Side)...</Text>
             <Text style={styles.loaderSubText}>{title} ({provider.toUpperCase()})</Text>
           </View>
         </View>
       ) : null}
 
-      {/* 
       {isExtracting && !finalStreamUrl && (
         <ClientSideExtractor
           tmdbId={id as string}
@@ -240,13 +207,12 @@ export default function WatchScreen() {
           onSubtitlesExtracted={handleSubtitlesExtracted}
         />
       )}
-      */}
 
       {extractionFailed && !finalStreamUrl && (
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={80} color={colors.red} />
           <Text style={styles.errorTitle}>Flux introuvable</Text>
-          <Text style={styles.errorSub}>L'extracteur serveur n'a pas pu trouver le flux vidéo sur {provider.toUpperCase()}.</Text>
+          <Text style={styles.errorSub}>L'extracteur client n'a pas pu trouver le flux vidéo sur {provider.toUpperCase()}.</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => { setExtractionFailed(false); setIsExtracting(true); }}>
             <Text style={styles.retryText}>Réessayer</Text>
           </TouchableOpacity>
@@ -278,7 +244,7 @@ export default function WatchScreen() {
               }}
             />
           </View>
-          
+
           {!isPlayerFullscreen && (
             <ScrollView style={styles.metadataScroll} contentContainerStyle={{ padding: 20, paddingBottom: 50 }} showsVerticalScrollIndicator={false}>
               {/* Title & Meta */}
@@ -289,7 +255,7 @@ export default function WatchScreen() {
                 {tmdbDetails?.runtime && <Text style={styles.metaYear}>{tmdbDetails.runtime} min</Text>}
               </View>
               <Text style={styles.overview}>
-                {(type === 'tv' || type === 'series') && seasonData?.episodes?.find((ep: any) => ep.episode_number === parseInt(episode as string))?.overview 
+                {(type === 'tv' || type === 'series') && seasonData?.episodes?.find((ep: any) => ep.episode_number === parseInt(episode as string))?.overview
                   ? seasonData?.episodes?.find((ep: any) => ep.episode_number === parseInt(episode as string)).overview
                   : tmdbDetails?.overview || "Aucune description disponible pour ce programme."}
               </Text>
@@ -297,7 +263,7 @@ export default function WatchScreen() {
               {/* Next/Prev Buttons for TV */}
               {(type === 'tv' || type === 'series') && (
                 <View style={styles.navButtonsRow}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.navBtn, parseInt(episode as string) <= 1 && styles.navBtnDisabled]}
                     disabled={parseInt(episode as string) <= 1}
                     onPress={() => router.setParams({ episode: (parseInt(episode as string) - 1).toString() })}
@@ -306,7 +272,7 @@ export default function WatchScreen() {
                     <Text style={styles.navBtnText}>Précédent</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.navBtn, (!seasonData?.episodes || parseInt(episode as string) >= seasonData.episodes.length) && styles.navBtnDisabled]}
                     disabled={!seasonData?.episodes || parseInt(episode as string) >= seasonData.episodes.length}
                     onPress={() => router.setParams({ episode: (parseInt(episode as string) + 1).toString() })}
@@ -323,17 +289,17 @@ export default function WatchScreen() {
                   <Text style={styles.sectionTitle}>Titres Similaires</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 20 }}>
                     {recommendations.map((item: any) => (
-                      <TouchableOpacity 
-                        key={item.tmdbId} 
+                      <TouchableOpacity
+                        key={item.tmdbId}
                         style={styles.recCard}
                         onPress={() => router.push({
                           pathname: `/watch/${item.tmdbId}`,
                           params: { type: item.type, title: item.title, posterPath: item.posterPath, ...(item.type === 'tv' && { season: '1', episode: '1' }) }
                         })}
                       >
-                        <Image 
-                          source={{ uri: `https://image.tmdb.org/t/p/w500${item.posterPath}` }} 
-                          style={styles.recPoster} 
+                        <Image
+                          source={{ uri: `https://image.tmdb.org/t/p/w500${item.posterPath}` }}
+                          style={styles.recPoster}
                         />
                       </TouchableOpacity>
                     ))}
@@ -351,7 +317,7 @@ export default function WatchScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'black' },
   mainLayout: { flex: 1 },
-  topVideoWrapper: { width: '100%', aspectRatio: 16/9, backgroundColor: 'black', zIndex: 10 },
+  topVideoWrapper: { width: '100%', aspectRatio: 16 / 9, backgroundColor: 'black', zIndex: 10 },
   fullscreenVideoWrapper: { flex: 1, width: '100%', backgroundColor: 'black', zIndex: 10 },
   metadataScroll: { flex: 1, backgroundColor: '#0a0a0f' },
   metaTitle: { color: 'white', fontSize: 24, fontWeight: 'bold', marginBottom: 10 },
@@ -360,7 +326,7 @@ const styles = StyleSheet.create({
   hdBadge: { backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   hdText: { color: colors.muted, fontSize: 10, fontWeight: 'bold' },
   overview: { color: 'rgba(255,255,255,0.8)', fontSize: 14, lineHeight: 22, marginBottom: 30 },
-  
+
   navButtonsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 40, gap: 15 },
   navBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg2, paddingVertical: 12, borderRadius: 12, gap: 8 },
   navBtnDisabled: { opacity: 0.5 },
@@ -378,12 +344,12 @@ const styles = StyleSheet.create({
   providerTextActive: { color: colors.red },
   prePlayContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   overlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.5)' },
-  playButtonLarge: { 
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 10 }, 
-    shadowOpacity: 0.5, 
+  playButtonLarge: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
     shadowRadius: 15,
-    elevation: 10 
+    elevation: 10
   },
   loaderContainer: { flex: 1, backgroundColor: '#0a0a0f', justifyContent: 'center', alignItems: 'center' },
   loaderContent: { alignItems: 'center', gap: 15 },
