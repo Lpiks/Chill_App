@@ -18,6 +18,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useRouter } from 'expo-router';
 import Slider from '@react-native-community/slider';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
 import { PremiumAlert } from '../utils/PremiumAlert';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -102,6 +103,11 @@ export const VideoPlayer = ({
   const [showSettings, setShowSettings] = useState(false);
   const [showCC, setShowCC] = useState(false);
   
+  // Gesture States
+  const [isFastForwarding, setIsFastForwarding] = useState(false);
+  const [isRewinding, setIsRewinding] = useState(false);
+  const rewindInterval = useRef<any>(null);
+
   // Premium Subtitle States
   const [showSubSettings, setShowSubSettings] = useState(false);
   const [subSize, setSubSize] = useState(18); 
@@ -147,12 +153,44 @@ export const VideoPlayer = ({
     if (!showControls) startControlsTimer();
   };
 
+  const startFastForward = () => {
+    if (checkLock() || !isPlaying) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    player.playbackRate = 2.0;
+    setIsFastForwarding(true);
+  };
+
+  const stopFastForward = () => {
+    if (!isFastForwarding) return;
+    player.playbackRate = playbackSpeed;
+    setIsFastForwarding(false);
+  };
+
+  const startRewind = () => {
+    if (checkLock() || !isPlaying) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setIsRewinding(true);
+    if (rewindInterval.current) clearInterval(rewindInterval.current);
+    rewindInterval.current = setInterval(() => {
+      player.seekBy(-2);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }, 250);
+  };
+
+  const stopRewind = () => {
+    if (!isRewinding) return;
+    if (rewindInterval.current) clearInterval(rewindInterval.current);
+    setIsRewinding(false);
+  };
+
   const router = useRouter();
 
   const handleBack = async () => {
     if (isFullscreen) {
       await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
       setIsFullscreen(false);
+      if (onFullscreenChange) onFullscreenChange(false);
+      return; // Exit fullscreen, but don't close the page
     }
     router.back();
   };
@@ -384,9 +422,8 @@ export const VideoPlayer = ({
   };
 
   return (
-    <View style={[styles.container, isFullscreen && styles.fullscreenContainer]}>
+    <View style={[styles.container, !isFullscreen && { aspectRatio: 16 / 9 }, isFullscreen && styles.fullscreenContainer]}>
       <StatusBar hidden={isFullscreen} />
-      
       <TouchableWithoutFeedback onPress={toggleControls} disabled={isLocked && !isHost}>
         <View style={styles.videoWrapper}>
           <VideoView
@@ -396,6 +433,41 @@ export const VideoPlayer = ({
             allowsPictureInPicture={true}
             contentFit={contentFit}
           />
+
+          {/* Transparent shield with split left/right hold zones */}
+          <View style={[StyleSheet.absoluteFill, { flexDirection: 'row' }]}>
+            <TouchableWithoutFeedback 
+              onPress={toggleControls}
+              onLongPress={startRewind}
+              onPressOut={stopRewind}
+              delayLongPress={300}
+              disabled={isLocked && !isHost}
+            >
+              <View style={{ flex: 1 }} />
+            </TouchableWithoutFeedback>
+
+            <TouchableWithoutFeedback 
+              onPress={toggleControls}
+              onLongPress={startFastForward}
+              onPressOut={stopFastForward}
+              delayLongPress={300}
+              disabled={isLocked && !isHost}
+            >
+              <View style={{ flex: 1 }} />
+            </TouchableWithoutFeedback>
+          </View>
+
+          {/* Gesture Indicators */}
+          {isFastForwarding && (
+            <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(150)} style={styles.fastForwardBadge}>
+              <Text style={styles.badgeText}>▶▶ 2X</Text>
+            </Animated.View>
+          )}
+          {isRewinding && (
+            <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(150)} style={styles.rewindBadge}>
+              <Text style={styles.badgeText}>◀◀ -2s</Text>
+            </Animated.View>
+          )}
 
           {/* Subtitle Overlay */}
           {currentSubtitleText && !showCC && !showSubSettings && (
@@ -422,8 +494,8 @@ export const VideoPlayer = ({
               style={[
                 styles.controlsOverlay, 
                 { 
-                  paddingTop: (isFullscreen ? insets.top : 0) + 10, 
-                  paddingBottom: (isFullscreen ? insets.bottom : 0) + 10 
+                  paddingTop: 15, 
+                  paddingBottom: 15 
                 }
               ]}
             >
@@ -696,11 +768,14 @@ export const VideoPlayer = ({
 };
 
 const styles = StyleSheet.create({
-  container: { width: '100%', aspectRatio: 16 / 9, backgroundColor: 'black' },
+  container: { width: '100%', backgroundColor: 'black' },
   fullscreenContainer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999, aspectRatio: undefined, flex: 1 },
   videoWrapper: { flex: 1, justifyContent: 'center', overflow: 'hidden' },
   subtitleOverlay: { position: 'absolute', bottom: 100, left: 20, right: 20, alignItems: 'center', pointerEvents: 'none', zIndex: 50 },
   subtitleText: { color: 'white', fontSize: 18, fontWeight: 'bold', textAlign: 'center', backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 15, paddingVertical: 5, borderRadius: 8, overflow: 'hidden', textShadowColor: 'black', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 3 },
+  fastForwardBadge: { position: 'absolute', top: 50, right: 40, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, zIndex: 100 },
+  rewindBadge: { position: 'absolute', top: 50, left: 40, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, zIndex: 100 },
+  badgeText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
   loaderOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   controlsOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'space-between' },
   topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, gap: 15 },
