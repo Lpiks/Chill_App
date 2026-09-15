@@ -135,56 +135,62 @@ export default function ChatScreen() {
   // Socket setup
   useEffect(() => {
     let socket: any;
-    
+
+    const handleNewMessage = (message: Message) => {
+      if (message.conversationId === conversationId) {
+        queryClient.setQueryData(['messages', conversationId], (old: any) => ({
+          ...old,
+          pages: [[message, ...old.pages[0]], ...old.pages.slice(1)]
+        }));
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        // Mark as read if user is active
+        api.put(`/conversations/${conversationId}/read`);
+      }
+    };
+
+    const handleMessageReaction = ({ messageId, reactions }: { messageId: string, reactions: any[] }) => {
+      queryClient.setQueryData(['messages', conversationId], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => 
+            page.map((m: any) => 
+              m._id === messageId ? { ...m, reactions } : m
+            )
+          )
+        };
+      });
+    };
+
+    const handleMessageDeleted = ({ messageId }: { messageId: string }) => {
+      queryClient.setQueryData(['messages', conversationId], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => page.filter((m: any) => m._id !== messageId))
+        };
+      });
+    };
+
+    const handleUserTyping = ({ userId }: { userId: string }) => {
+      if (userId !== currentUser?.id) {
+        setTypingUsers(prev => [...new Set([...prev, userId])]);
+      }
+    };
+
+    const handleUserStopTyping = ({ userId }: { userId: string }) => {
+      setTypingUsers(prev => prev.filter(id => id !== userId));
+    };
+
     const initSocket = async () => {
       socket = await getSocket();
       socket.emit('join-conversations', [conversationId]);
 
-      socket.on('new-message', (message: Message) => {
-        if (message.conversationId === conversationId) {
-          queryClient.setQueryData(['messages', conversationId], (old: any) => ({
-            ...old,
-            pages: [[message, ...old.pages[0]], ...old.pages.slice(1)]
-          }));
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          // Mark as read if user is active
-          api.put(`/conversations/${conversationId}/read`);
-        }
-      });
-
-      socket.on('message-reaction', ({ messageId, reactions }: { messageId: string, reactions: any[] }) => {
-        queryClient.setQueryData(['messages', conversationId], (old: any) => {
-          if (!old) return old;
-          return {
-            ...old,
-            pages: old.pages.map((page: any) => 
-              page.map((m: any) => 
-                m._id === messageId ? { ...m, reactions } : m
-              )
-            )
-          };
-        });
-      });
-
-      socket.on('message-deleted', ({ messageId }: { messageId: string }) => {
-        queryClient.setQueryData(['messages', conversationId], (old: any) => {
-          if (!old) return old;
-          return {
-            ...old,
-            pages: old.pages.map((page: any) => page.filter((m: any) => m._id !== messageId))
-          };
-        });
-      });
-
-      socket.on('user-typing', ({ userId }: { userId: string }) => {
-        if (userId !== currentUser?.id) {
-          setTypingUsers(prev => [...new Set([...prev, userId])]);
-        }
-      });
-
-      socket.on('user-stop-typing', ({ userId }: { userId: string }) => {
-        setTypingUsers(prev => prev.filter(id => id !== userId));
-      });
+      socket.on('new-message', handleNewMessage);
+      socket.on('message-reaction', handleMessageReaction);
+      socket.on('message-deleted', handleMessageDeleted);
+      socket.on('user-typing', handleUserTyping);
+      socket.on('user-stop-typing', handleUserStopTyping);
     };
 
     initSocket();
@@ -192,11 +198,11 @@ export default function ChatScreen() {
 
     return () => {
       if (socket) {
-        socket.off('new-message');
-        socket.off('user-typing');
-        socket.off('user-stop-typing');
-        socket.off('message-reaction');
-        socket.off('message-deleted');
+        socket.off('new-message', handleNewMessage);
+        socket.off('message-reaction', handleMessageReaction);
+        socket.off('message-deleted', handleMessageDeleted);
+        socket.off('user-typing', handleUserTyping);
+        socket.off('user-stop-typing', handleUserStopTyping);
       }
     };
   }, [conversationId]);

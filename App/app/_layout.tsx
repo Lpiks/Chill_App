@@ -15,6 +15,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import * as NavigationBar from 'expo-navigation-bar';
 import api from '../services/api';
+import { getSocket, disconnectSocket } from '../services/socket';
 
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
@@ -147,6 +148,51 @@ export default function RootLayout() {
       const interval = setInterval(fetchData, 30000);
       return () => clearInterval(interval);
     }
+  }, [isAuthenticated]);
+
+  // Global WebSocket for Real-time Sync
+  useEffect(() => {
+    let globalSocket: any;
+    let cleanupFn: (() => void) | undefined;
+
+    const setupGlobalSocket = async () => {
+      if (!isAuthenticated) {
+        disconnectSocket();
+        return;
+      }
+
+      globalSocket = await getSocket();
+      
+      try {
+        const { data: convs } = await api.get('/conversations');
+        const convIds = convs.map((c: any) => c.id || c._id);
+        if (convIds.length > 0) {
+          globalSocket.emit('join-conversations', convIds);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch conversations for global socket', err);
+      }
+
+      const handleGlobalEvent = () => {
+        queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      };
+
+      globalSocket.on('new-message', handleGlobalEvent);
+      globalSocket.on('message-deleted', handleGlobalEvent);
+
+      cleanupFn = () => {
+        if (globalSocket) {
+          globalSocket.off('new-message', handleGlobalEvent);
+          globalSocket.off('message-deleted', handleGlobalEvent);
+        }
+      };
+    };
+
+    setupGlobalSocket();
+
+    return () => {
+      if (cleanupFn) cleanupFn();
+    };
   }, [isAuthenticated]);
 
   const registerForPushNotificationsAsync = async () => {
