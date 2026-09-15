@@ -17,6 +17,11 @@ const messageSchema = new mongoose.Schema({
     year: Number
   },
   status: { type: String, enum: ['sent', 'delivered', 'seen'], default: 'sent' },
+  replyTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Message' },
+  reactions: [{
+    emoji: String,
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  }],
   deletedAt: Date,                        // soft delete
   createdAt: { type: Date, default: Date.now }
 });

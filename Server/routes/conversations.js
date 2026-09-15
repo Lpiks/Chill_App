@@ -122,6 +122,10 @@ router.get('/:id/messages', auth, async (req, res) => {
         path: 'sharedPost',
         populate: { path: 'userId', select: 'name username avatar avatarUrl' }
       })
+      .populate({
+        path: 'replyTo',
+        populate: { path: 'senderId', select: 'name avatar' }
+      })
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit);
@@ -135,7 +139,7 @@ router.get('/:id/messages', auth, async (req, res) => {
 // POST /api/conversations/:id/messages
 router.post('/:id/messages', [auth, checkMessageLimit], async (req, res) => {
   try {
-    const { type, content, tmdbData } = req.body;
+    const { type, content, tmdbData, replyTo } = req.body;
     const io = req.app.get('io');
 
     const message = new Message({
@@ -143,14 +147,15 @@ router.post('/:id/messages', [auth, checkMessageLimit], async (req, res) => {
       senderId: req.user.id,
       type,
       content,
-      tmdbData
+      tmdbData,
+      replyTo
     });
 
     await message.save();
 
     await Conversation.findByIdAndUpdate(req.params.id, {
       lastMessage: {
-        content: type === 'text' ? content : (type === 'voice' ? '🎤 Message vocal' : '🎬 Partage de film'),
+        content: type === 'text' ? content : (type === 'voice' ? '🎤 Message vocal' : (type === 'media' && tmdbData?.mediaType === 'tv' ? '🎬 Partage de série' : (content || '🎬 Partage de film'))),
         type,
         senderId: req.user.id,
         createdAt: Date.now()
@@ -166,7 +171,12 @@ router.post('/:id/messages', [auth, checkMessageLimit], async (req, res) => {
       await req.userModel.save();
     }
 
-    const populatedMessage = await Message.findById(message._id).populate('senderId', 'name avatar');
+    const populatedMessage = await Message.findById(message._id)
+      .populate('senderId', 'name avatar')
+      .populate({
+        path: 'replyTo',
+        populate: { path: 'senderId', select: 'name avatar' }
+      });
     io.to(`conversation:${req.params.id}`).emit('new-message', populatedMessage);
 
     // Send Push Notifications & Save Notification Docs
@@ -184,7 +194,7 @@ router.post('/:id/messages', [auth, checkMessageLimit], async (req, res) => {
         sendPushNotification(
           memberId,
           sender ? sender.name : 'Nouveau message',
-          type === 'text' ? content : (type === 'voice' ? '🎤 Message vocal' : '🎬 Partage de film'),
+          type === 'text' ? content : (type === 'voice' ? '🎤 Message vocal' : (type === 'media' && tmdbData?.mediaType === 'tv' ? '🎬 Partage de série' : (content || '🎬 Partage de film'))),
           { type: 'new_message', conversationId: req.params.id }
         );
       }
@@ -326,6 +336,80 @@ router.delete('/:id/members/:userId', auth, async (req, res) => {
     await conversation.save();
     res.json({ message: 'Membre retiré' });
   } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /api/conversations/:id/messages/:messageId/react
+router.post('/:id/messages/:messageId/react', auth, async (req, res) => {
+  try {
+    const { emoji } = req.body;
+    const message = await Message.findById(req.params.messageId);
+    if (!message) return res.status(404).json({ message: 'Message not found' });
+    
+    // Check if user already reacted with this emoji
+    const existingReactionIndex = message.reactions.findIndex(r => r.userId.toString() === req.user.id && r.emoji === emoji);
+    
+    if (existingReactionIndex > -1) {
+      message.reactions.splice(existingReactionIndex, 1);
+    } else {
+      // User can only have one reaction per message, remove any other reaction by this user first
+      message.reactions = message.reactions.filter(r => r.userId.toString() !== req.user.id);
+      message.reactions.push({ emoji, userId: req.user.id });
+    }
+    
+    await message.save();
+    
+    const io = req.app.get('io');
+    io.to(`conversation:${req.params.id}`).emit('message-reaction', {
+      messageId: req.params.messageId,
+      reactions: message.reactions
+    });
+    
+    res.json(message.reactions);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// DELETE /api/conversations/:id/messages/:messageId
+router.delete('/:id/messages/:messageId', auth, async (req, res) => {
+  try {
+    const message = await Message.findById(req.params.messageId);
+    if (!message) return res.status(404).json({ message: 'Message not found' });
+    
+    if (message.senderId.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Non autorisé' });
+    }
+    
+    await Message.findByIdAndDelete(req.params.messageId);
+    
+    const conversation = await Conversation.findById(req.params.id);
+    if (conversation.lastMessage && new Date(conversation.lastMessage.createdAt).getTime() === new Date(message.createdAt).getTime()) {
+      const lastMsg = await Message.findOne({ conversationId: req.params.id }).sort({ createdAt: -1 });
+      if (lastMsg) {
+        let content = lastMsg.type === 'text' ? lastMsg.content : (lastMsg.type === 'voice' ? '🎤 Message vocal' : (lastMsg.type === 'media' && lastMsg.tmdbData?.mediaType === 'tv' ? '🎬 Partage de série' : (lastMsg.content || '🎬 Partage de film')));
+        conversation.lastMessage = {
+          content,
+          type: lastMsg.type,
+          senderId: lastMsg.senderId,
+          createdAt: lastMsg.createdAt
+        };
+      } else {
+        conversation.lastMessage = null;
+      }
+      await conversation.save();
+    }
+    
+    const io = req.app.get('io');
+    io.to(`conversation:${req.params.id}`).emit('message-deleted', {
+      messageId: req.params.messageId
+    });
+    
+    res.json({ message: 'Message supprimé' });
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ message: 'Server error' });
   }
 });

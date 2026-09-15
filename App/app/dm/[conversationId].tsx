@@ -47,6 +47,45 @@ export default function ChatScreen() {
   
   const flashListRef = useRef<any>(null);
 
+  const [selectedMessage, setSelectedMessage] = useState<any>(null);
+  const [replyingTo, setReplyingTo] = useState<any>(null);
+  const lastPressRef = useRef<{ [key: string]: number }>({});
+
+  const handleMessagePress = (message: any) => {
+    const time = new Date().getTime();
+    const delta = time - (lastPressRef.current[message._id] || 0);
+    
+    if (delta < 300) {
+      handleReact(message._id, '❤️');
+    }
+    lastPressRef.current[message._id] = time;
+  };
+
+  const handleLongPress = (message: any) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSelectedMessage(message);
+  };
+
+  const handleReact = async (messageId: string, emoji: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await api.post(`/conversations/${conversationId}/messages/${messageId}/react`, { emoji });
+      setSelectedMessage(null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDelete = async (messageId: string) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try {
+      await api.delete(`/conversations/${conversationId}/messages/${messageId}`);
+      setSelectedMessage(null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   // Queries
   const { data: conversation } = useQuery({
     queryKey: ['conversation', conversationId],
@@ -103,6 +142,30 @@ export default function ChatScreen() {
         }
       });
 
+      socket.on('message-reaction', ({ messageId, reactions }: { messageId: string, reactions: any[] }) => {
+        queryClient.setQueryData(['messages', conversationId], (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page: any) => 
+              page.map((m: any) => 
+                m._id === messageId ? { ...m, reactions } : m
+              )
+            )
+          };
+        });
+      });
+
+      socket.on('message-deleted', ({ messageId }: { messageId: string }) => {
+        queryClient.setQueryData(['messages', conversationId], (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page: any) => page.filter((m: any) => m._id !== messageId))
+          };
+        });
+      });
+
       socket.on('user-typing', ({ userId }: { userId: string }) => {
         if (userId !== currentUser?.id) {
           setTypingUsers(prev => [...new Set([...prev, userId])]);
@@ -122,6 +185,8 @@ export default function ChatScreen() {
         socket.off('new-message');
         socket.off('user-typing');
         socket.off('user-stop-typing');
+        socket.off('message-reaction');
+        socket.off('message-deleted');
       }
     };
   }, [conversationId]);
@@ -135,8 +200,10 @@ export default function ChatScreen() {
     try {
       await api.post(`/conversations/${conversationId}/messages`, {
         type: 'text',
-        content: text
+        content: text,
+        replyTo: replyingTo?._id
       });
+      setReplyingTo(null);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (error: any) {
       console.error('Error fetching messages:', error);
@@ -198,9 +265,27 @@ export default function ChatScreen() {
     return (
       <View style={[styles.messageRow, isMe ? styles.myMessageRow : styles.otherMessageRow]}>
         {!isMe && (
-          <Image source={{ uri: (item.senderId as any).avatar }} style={styles.msgAvatar} />
+          (item.senderId as any).avatar ? (
+            <Image source={{ uri: (item.senderId as any).avatar }} style={styles.msgAvatar} />
+          ) : (
+            <View style={[styles.msgAvatar, { backgroundColor: '#333', justifyContent: 'center', alignItems: 'center' }]}>
+              <Text style={{ color: 'white', fontWeight: 'bold' }}>{((item.senderId as any).name || 'A').charAt(0).toUpperCase()}</Text>
+            </View>
+          )
         )}
-        <View style={[styles.bubble, isMe ? styles.myBubble : styles.otherBubble]}>
+        <View style={{ alignItems: isMe ? 'flex-end' : 'flex-start', flex: 1, marginLeft: isMe ? 40 : 0, marginRight: isMe ? 0 : 40 }}>
+          {(item as any).replyTo && (
+            <View style={[styles.replyBubble, isMe ? styles.myReplyBubble : styles.otherReplyBubble]}>
+              <Text style={styles.replyName}>{isMe ? 'Vous avez répondu' : `En réponse à ${(item as any).replyTo.senderId?.name}`}</Text>
+              <Text style={styles.replyText} numberOfLines={1}>{(item as any).replyTo.content || 'Média'}</Text>
+            </View>
+          )}
+          <TouchableOpacity 
+            activeOpacity={0.8}
+            onPress={() => handleMessagePress(item)}
+            onLongPress={() => handleLongPress(item)}
+            style={[styles.bubble, isMe ? styles.myBubble : styles.otherBubble, (item as any).replyTo ? { borderTopLeftRadius: 5, borderTopRightRadius: 5 } : {}]}
+          >
           {item.type === 'text' && (
             <Text style={styles.messageText}>{item.content}</Text>
           )}
@@ -220,7 +305,9 @@ export default function ChatScreen() {
               <View style={styles.mediaInfo}>
                 <Text style={styles.mediaTitle} numberOfLines={1}>{item.tmdbData.title}</Text>
                 <Text style={styles.mediaSub}>{item.tmdbData.year} • ⭐ {item.tmdbData.rating?.toFixed(1)}</Text>
-                <Text style={styles.mediaLink}>Voir ce film</Text>
+                <Text style={styles.mediaLink}>
+                  {item.tmdbData.mediaType === 'tv' ? 'Voir cette série' : 'Voir ce film'}
+                </Text>
               </View>
             </TouchableOpacity>
           )}
@@ -262,6 +349,16 @@ export default function ChatScreen() {
               />
             )}
           </View>
+          </TouchableOpacity>
+          {(item as any).reactions && (item as any).reactions.length > 0 && (
+            <View style={[styles.reactionsRow, isMe ? { right: 5 } : { left: 5 }]}>
+              {(item as any).reactions.slice(0, 3).map((r: any, idx: number) => (
+                <View key={idx} style={styles.reactionBadge}>
+                  <Text style={styles.reactionEmoji}>{r.emoji}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       </View>
     );
@@ -318,6 +415,17 @@ export default function ChatScreen() {
           contentContainerStyle={{ paddingHorizontal: 15, paddingBottom: 20 }}
         />
 
+        {replyingTo && (
+          <View style={styles.replyingBar}>
+            <View style={{ flex: 1, borderLeftWidth: 3, borderLeftColor: colors.red, paddingLeft: 10 }}>
+              <Text style={styles.replyingName}>Répondre à {replyingTo.senderId?.name}</Text>
+              <Text style={styles.replyingText} numberOfLines={1}>{replyingTo.content || 'Média'}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setReplyingTo(null)} style={{ padding: 5 }}>
+              <Ionicons name="close-circle" size={24} color={colors.muted} />
+            </TouchableOpacity>
+          </View>
+        )}
         <View style={[
           styles.inputBar, 
           { paddingBottom: keyboardVisible ? 10 : Math.max(insets.bottom, 10) }
@@ -353,6 +461,43 @@ export default function ChatScreen() {
         </View>
       </KeyboardAvoidingView>
 
+      <Modal
+        visible={!!selectedMessage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedMessage(null)}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setSelectedMessage(null)}>
+          <View style={styles.bottomSheet}>
+            <View style={styles.reactionContainer}>
+              {['❤️', '😂', '😮', '😢', '👍', '👎'].map(emoji => (
+                <TouchableOpacity key={emoji} onPress={() => handleReact(selectedMessage._id, emoji)}>
+                  <Text style={styles.bigEmoji}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.actionList}>
+              <TouchableOpacity style={styles.actionItem} onPress={() => { setReplyingTo(selectedMessage); setSelectedMessage(null); }}>
+                <Ionicons name="arrow-undo-outline" size={24} color="white" />
+                <Text style={styles.actionText}>Répondre</Text>
+              </TouchableOpacity>
+              {selectedMessage && selectedMessage.type === 'text' && (
+                <TouchableOpacity style={styles.actionItem} onPress={() => { setSelectedMessage(null); PremiumAlert.alert('Info', 'Veuillez sélectionner le texte pour copier'); }}>
+                  <Ionicons name="copy-outline" size={24} color="white" />
+                  <Text style={styles.actionText}>Copier</Text>
+                </TouchableOpacity>
+              )}
+              {selectedMessage && (((selectedMessage.senderId as any)._id || (selectedMessage.senderId as any).id || selectedMessage.senderId) === currentUser?.id) && (
+                <TouchableOpacity style={[styles.actionItem, { borderBottomWidth: 0 }]} onPress={() => handleDelete(selectedMessage._id)}>
+                  <Ionicons name="trash-outline" size={24} color={colors.red} />
+                  <Text style={[styles.actionText, { color: colors.red }]}>Supprimer</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {isRecording && (
         <View style={styles.recordingOverlay}>
           <Text style={styles.recordingText}>Enregistrement...</Text>
@@ -385,7 +530,29 @@ const styles = StyleSheet.create({
   bubble: { padding: 12, borderRadius: 18 },
   myBubble: { backgroundColor: colors.red, borderBottomRightRadius: 4 },
   otherBubble: { backgroundColor: '#1a1a28', borderBottomLeftRadius: 4 },
-  messageText: { color: 'white', fontSize: 15, lineHeight: 20 },
+  messageText: { color: 'white', fontSize: 16, lineHeight: 22 },
+  
+  replyBubble: { padding: 8, paddingBottom: 20, marginBottom: -15, backgroundColor: '#1a1a1a', borderRadius: 15, opacity: 0.8 },
+  myReplyBubble: { alignSelf: 'flex-end', borderBottomRightRadius: 0 },
+  otherReplyBubble: { alignSelf: 'flex-start', borderBottomLeftRadius: 0 },
+  replyName: { color: colors.red, fontSize: 12, fontWeight: 'bold' },
+  replyText: { color: '#ccc', fontSize: 12, marginTop: 2 },
+  
+  reactionsRow: { flexDirection: 'row', marginTop: -10, zIndex: 10, backgroundColor: 'transparent' },
+  reactionBadge: { backgroundColor: '#333', borderRadius: 12, padding: 3, borderWidth: 1, borderColor: 'black', marginHorizontal: -2 },
+  reactionEmoji: { fontSize: 12 },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  bottomSheet: { backgroundColor: '#111', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40 },
+  reactionContainer: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#222', borderRadius: 30, padding: 15, marginBottom: 20 },
+  bigEmoji: { fontSize: 32 },
+  actionList: { backgroundColor: '#222', borderRadius: 15 },
+  actionItem: { flexDirection: 'row', alignItems: 'center', padding: 15, borderBottomWidth: 1, borderBottomColor: '#333' },
+  actionText: { color: 'white', fontSize: 16, marginLeft: 15, fontWeight: '600' },
+  
+  replyingBar: { flexDirection: 'row', backgroundColor: '#111', padding: 10, alignItems: 'center', borderTopWidth: 1, borderTopColor: '#333' },
+  replyingName: { color: colors.red, fontSize: 14, fontWeight: 'bold' },
+  replyingText: { color: '#aaa', fontSize: 13, marginTop: 2 },
   bubbleFooter: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 4 },
   msgTime: { fontSize: 10, color: 'rgba(255,255,255,0.6)' },
   inputBar: { 

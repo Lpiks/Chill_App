@@ -18,6 +18,7 @@ import { config } from '../../constants/config';
 import { Ionicons } from '@expo/vector-icons';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { CastSlider } from '../../components/CastSlider';
+import { ShareModal } from '../../components/ShareModal';
 import * as Haptics from 'expo-haptics';
 import api from '../../services/api';
 import { PremiumAlert } from '../../utils/PremiumAlert';
@@ -30,6 +31,13 @@ export default function SeriesDetailScreen() {
   const queryClient = useQueryClient();
   const tmdbId = parseInt(id as string);
   const [selectedSeason, setSelectedSeason] = useState(1);
+  const [showShareModal, setShowShareModal] = useState(false);
+
+  const handleShare = () => {
+    if (!series) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowShareModal(true);
+  };
 
   const { data: series, isLoading: loadSeries } = useQuery({
     queryKey: ['series', id],
@@ -136,6 +144,9 @@ export default function SeriesDetailScreen() {
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
+          <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+            <Ionicons name="share-outline" size={24} color="white" />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.content}>
@@ -221,6 +232,21 @@ export default function SeriesDetailScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {series && (
+        <ShareModal 
+          visible={showShareModal} 
+          onClose={() => setShowShareModal(false)} 
+          tmdbData={{
+            mediaType: 'tv',
+            tmdbId: series.id,
+            posterPath: series.poster_path,
+            title: series.name,
+            year: series.first_air_date?.split('-')[0] || 'Inconnu',
+            rating: series.vote_average || 0
+          }} 
+        />
+      )}
     </View>
   );
 }
@@ -231,6 +257,7 @@ const styles = StyleSheet.create({
   backdrop: { width: '100%', height: '100%' },
   backdropGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 150 },
   backBtn: { position: 'absolute', top: 50, left: 20, backgroundColor: 'rgba(0,0,0,0.5)', padding: 10, borderRadius: 25 },
+  shareBtn: { position: 'absolute', top: 50, right: 20, backgroundColor: 'rgba(0,0,0,0.5)', padding: 10, borderRadius: 25 },
   content: { paddingHorizontal: 20, marginTop: -40 },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { color: colors.white, fontSize: 32, fontFamily: 'BebasNeue_400Regular', flex: 1 },

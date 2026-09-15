@@ -18,6 +18,7 @@ import { config } from '../../constants/config';
 import { Ionicons } from '@expo/vector-icons';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { CastSlider } from '../../components/CastSlider';
+import { ShareModal } from '../../components/ShareModal';
 import * as Haptics from 'expo-haptics';
 import api from '../../services/api';
 import { PremiumAlert } from '../../utils/PremiumAlert';
@@ -29,6 +30,7 @@ export default function MovieDetailScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const tmdbId = parseInt(id as string);
+  const [showShareModal, setShowShareModal] = React.useState(false);
 
   const { data: movie, isLoading } = useQuery({
     queryKey: ['movie', id],
@@ -99,10 +101,8 @@ export default function MovieDetailScreen() {
 
   const handleShare = async () => {
     if (!movie) return;
-    const result = await Share.share({
-      message: `Regarde ${movie.title} sur Chill!`,
-      url: `https://chill.app/movie/${id}`
-    });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowShareModal(true);
   };
 
   const toggleWatchlist = () => {
@@ -199,6 +199,21 @@ export default function MovieDetailScreen() {
           <CastSlider id={id as string} type="movie" />
         </View>
       </ScrollView>
+
+      {movie && (
+        <ShareModal 
+          visible={showShareModal} 
+          onClose={() => setShowShareModal(false)} 
+          tmdbData={{
+            mediaType: 'movie',
+            tmdbId: movie.id,
+            posterPath: movie.poster_path,
+            title: movie.title,
+            year: movie.release_date?.split('-')[0] || 'Inconnu',
+            rating: movie.vote_average || 0
+          }} 
+        />
+      )}
     </View>
   );
 }
