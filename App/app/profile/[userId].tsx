@@ -186,7 +186,15 @@ export default function UserProfileScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={styles.msgBtn}
-                  onPress={() => router.push(`/dm/${userId}`)}
+                  onPress={async () => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    try {
+                      const res = await api.post('/conversations', { memberIds: [userId] });
+                      router.push(`/dm/${res.data._id || res.data.id}`);
+                    } catch (error) {
+                      console.error('Error opening DM:', error);
+                    }
+                  }}
                 >
                   <Ionicons name="chatbubble-outline" size={24} color="white" />
                 </TouchableOpacity>

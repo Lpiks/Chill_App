@@ -126,31 +126,35 @@ const Sidebar = () => {
               minHeight: '46px'
             })}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {item.icon}
-            </div>
-            {isHovered && (
-              <span style={{ marginLeft: '15px', fontWeight: 600, fontSize: '14px' }}>{item.name}</span>
-            )}
-            
-            {/* Badge */}
-            {item.badge > 0 && (
-              <span style={{
-                position: 'absolute',
-                top: '5px',
-                right: isHovered ? '15px' : '5px',
-                backgroundColor: isActive ? 'white' : colors.red,
-                color: isActive ? colors.red : 'white',
-                fontSize: '10px',
-                fontWeight: 'bold',
-                padding: '2px 6px',
-                borderRadius: '10px',
-                minWidth: '18px',
-                textAlign: 'center',
-                boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-              }}>
-                {item.badge}
-              </span>
+            {({ isActive }) => (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {item.icon}
+                </div>
+                {isHovered && (
+                  <span style={{ marginLeft: '15px', fontWeight: 600, fontSize: '14px' }}>{item.name}</span>
+                )}
+                
+                {/* Badge */}
+                {item.badge > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '5px',
+                    right: isHovered ? '15px' : '5px',
+                    backgroundColor: isActive ? 'white' : colors.red,
+                    color: isActive ? colors.red : 'white',
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    padding: '2px 6px',
+                    borderRadius: '10px',
+                    minWidth: '18px',
+                    textAlign: 'center',
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                  }}>
+                    {item.badge}
+                  </span>
+                )}
+              </>
             )}
           </NavLink>
         ))}
