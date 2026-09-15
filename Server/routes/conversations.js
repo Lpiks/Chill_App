@@ -385,22 +385,22 @@ router.delete('/:id/messages/:messageId', auth, async (req, res) => {
     
     await Message.findByIdAndDelete(req.params.messageId);
     
+    // Always find the actual latest message remaining in the conversation to update the preview
     const conversation = await Conversation.findById(req.params.id);
-    if (conversation.lastMessage && new Date(conversation.lastMessage.createdAt).getTime() === new Date(message.createdAt).getTime()) {
-      const lastMsg = await Message.findOne({ conversationId: req.params.id }).sort({ createdAt: -1 });
-      if (lastMsg) {
-        let content = lastMsg.type === 'text' ? lastMsg.content : (lastMsg.type === 'voice' ? '🎤 Message vocal' : (lastMsg.type === 'media' && lastMsg.tmdbData?.mediaType === 'tv' ? '🎬 Partage de série' : (lastMsg.content || '🎬 Partage de film')));
-        conversation.lastMessage = {
-          content,
-          type: lastMsg.type,
-          senderId: lastMsg.senderId,
-          createdAt: lastMsg.createdAt
-        };
-      } else {
-        conversation.lastMessage = null;
-      }
-      await conversation.save();
+    const lastMsg = await Message.findOne({ conversationId: req.params.id }).sort({ createdAt: -1 });
+    
+    if (lastMsg) {
+      let content = lastMsg.type === 'text' ? lastMsg.content : (lastMsg.type === 'voice' ? '🎤 Message vocal' : (lastMsg.type === 'media' && lastMsg.tmdbData?.mediaType === 'tv' ? '🎬 Partage de série' : (lastMsg.content || '🎬 Partage de film')));
+      conversation.lastMessage = {
+        content,
+        type: lastMsg.type,
+        senderId: lastMsg.senderId,
+        createdAt: lastMsg.createdAt
+      };
+    } else {
+      conversation.lastMessage = null;
     }
+    await conversation.save();
     
     const io = req.app.get('io');
     io.to(`conversation:${req.params.id}`).emit('message-deleted', {

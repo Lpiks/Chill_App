@@ -50,13 +50,23 @@ export default function ChatScreen() {
   const [selectedMessage, setSelectedMessage] = useState<any>(null);
   const [replyingTo, setReplyingTo] = useState<any>(null);
   const lastPressRef = useRef<{ [key: string]: number }>({});
+  const singleTapTimeoutRef = useRef<{ [key: string]: NodeJS.Timeout }>({});
 
   const handleMessagePress = (message: any) => {
     const time = new Date().getTime();
     const delta = time - (lastPressRef.current[message._id] || 0);
     
     if (delta < 300) {
+      clearTimeout(singleTapTimeoutRef.current[message._id]);
       handleReact(message._id, '❤️');
+    } else {
+      singleTapTimeoutRef.current[message._id] = setTimeout(() => {
+        if ((message.type as any) === 'media' && message.tmdbData) {
+          router.push(`/${message.tmdbData.mediaType}/${message.tmdbData.tmdbId}`);
+        } else if ((message.type as any) === 'post_share' && message.sharedPost) {
+          router.push(`/post/${message.sharedPost._id}`);
+        }
+      }, 300);
     }
     lastPressRef.current[message._id] = time;
   };
@@ -290,17 +300,14 @@ export default function ChatScreen() {
             <Text style={styles.messageText}>{item.content}</Text>
           )}
           {item.type === 'voice' && (
-            <TouchableOpacity style={styles.voiceBubble}>
+            <View style={styles.voiceBubble}>
               <Ionicons name="play" size={24} color="white" />
               <View style={styles.waveformPlaceholder} />
               <Text style={styles.duration}>0:10</Text>
-            </TouchableOpacity>
+            </View>
           )}
           {(item.type as any) === 'media' && item.tmdbData && (
-            <TouchableOpacity 
-              style={styles.mediaCard}
-              onPress={() => router.push(`/${item.tmdbData?.mediaType}/${item.tmdbData?.tmdbId}`)}
-            >
+            <View style={styles.mediaCard}>
               <Image source={{ uri: `https://image.tmdb.org/t/p/w200${item.tmdbData.posterPath}` }} style={styles.mediaPoster} />
               <View style={styles.mediaInfo}>
                 <Text style={styles.mediaTitle} numberOfLines={1}>{item.tmdbData.title}</Text>
@@ -309,13 +316,10 @@ export default function ChatScreen() {
                   {item.tmdbData.mediaType === 'tv' ? 'Voir cette série' : 'Voir ce film'}
                 </Text>
               </View>
-            </TouchableOpacity>
+            </View>
           )}
           {(item.type as any) === 'post_share' && (item as any).sharedPost && (
-            <TouchableOpacity 
-              style={styles.mediaCard}
-              onPress={() => router.push(`/post/${(item as any).sharedPost._id}`)}
-            >
+            <View style={styles.mediaCard}>
               <Image source={{ uri: `https://image.tmdb.org/t/p/w200${(item as any).sharedPost.posterPath}` }} style={styles.mediaPoster} />
               <View style={styles.mediaInfo}>
                 <Text style={styles.mediaTitle} numberOfLines={1}>{(item as any).sharedPost.title}</Text>
@@ -336,7 +340,7 @@ export default function ChatScreen() {
 
                 <Text style={styles.mediaLink}>Voir la publication</Text>
               </View>
-            </TouchableOpacity>
+            </View>
           )}
           <View style={styles.bubbleFooter}>
             <Text style={styles.msgTime}>{format(new Date(item.createdAt), 'HH:mm')}</Text>
