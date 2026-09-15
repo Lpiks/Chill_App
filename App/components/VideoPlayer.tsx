@@ -49,6 +49,12 @@ export interface QualityOption {
   value: string;
 }
 
+export interface ExternalPlaybackState {
+  isPlaying: boolean;
+  currentTime: number;
+  updatedAt: string | Date;
+}
+
 interface VideoPlayerProps {
   streamUrl: string;
   provider?: string;
@@ -65,6 +71,9 @@ interface VideoPlayerProps {
   onSeek?: (time: number) => void;
   onFullscreenChange?: (isFullscreen: boolean) => void;
   onDuration?: (duration: number) => void;
+  externalPlaybackState?: ExternalPlaybackState | null;
+  onBack?: () => void;
+  onChangeMedia?: () => void;
 }
 
 export const VideoPlayer = ({
@@ -82,7 +91,10 @@ export const VideoPlayer = ({
   onPlayPause,
   onSeek,
   onFullscreenChange,
-  onDuration
+  onDuration,
+  externalPlaybackState,
+  onBack,
+  onChangeMedia
 }: VideoPlayerProps) => {
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
@@ -192,7 +204,11 @@ export const VideoPlayer = ({
       if (onFullscreenChange) onFullscreenChange(false);
       return; // Exit fullscreen, but don't close the page
     }
-    router.back();
+    if (onBack) {
+      onBack();
+    } else {
+      router.back();
+    }
   };
 
   const checkLock = () => {
@@ -239,6 +255,31 @@ export const VideoPlayer = ({
     p.loop = false;
     p.play();
   });
+
+  // Sync to external Master/Slave state (Watch Party)
+  useEffect(() => {
+    if (!externalPlaybackState) return;
+
+    // Only apply if we are NOT the host (guest follows host)
+    // Or if we are in a democracy (unlocked), everyone syncs!
+    if (!isHost) {
+      // Sync play/pause state
+      if (externalPlaybackState.isPlaying !== isPlaying) {
+        setIsPlaying(externalPlaybackState.isPlaying);
+        if (externalPlaybackState.isPlaying) {
+          player.play();
+        } else {
+          player.pause();
+        }
+      }
+
+      // Sync time if drifted by more than 2 seconds
+      if (Math.abs(player.currentTime - externalPlaybackState.currentTime) > 2) {
+        player.currentTime = externalPlaybackState.currentTime;
+        setCurrentTime(externalPlaybackState.currentTime);
+      }
+    }
+  }, [externalPlaybackState]);
 
   // Fetch and Parse Subtitles when activeSubtitle changes
   useEffect(() => {
@@ -506,6 +547,11 @@ export const VideoPlayer = ({
                 </TouchableOpacity>
                 <Text style={styles.videoTitle} numberOfLines={1}>{title}</Text>
                 {isLocked && <Ionicons name="lock-closed" size={20} color={colors.red} style={{ marginRight: 10 }} />}
+                {isHost && onChangeMedia && (
+                  <TouchableOpacity onPress={onChangeMedia} style={{ marginRight: 15 }}>
+                    <Ionicons name="film-outline" size={24} color="white" />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity onPress={() => setShowSettings(true)}>
                   <Ionicons name="settings-outline" size={24} color="white" />
                 </TouchableOpacity>

@@ -104,7 +104,15 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('party-message', ({ roomId, message }) => {
+  socket.on('party-message', async ({ roomId, message }) => {
+    try {
+      await Room.findOneAndUpdate(
+        { roomId },
+        { $push: { messages: message } }
+      );
+    } catch (err) {
+      console.error('Failed to save party message', err);
+    }
     io.to(`party:${roomId}`).emit('party-message', message);
   });
 
@@ -118,6 +126,30 @@ io.on('connection', (socket) => {
       room.isLocked = isLocked;
       await room.save();
       io.to(`party:${roomId}`).emit('party-lock', { isLocked });
+    }
+  });
+
+  socket.on('party-change-media', async ({ roomId, tmdbId, mediaType, title, posterPath, season, episode }) => {
+    try {
+      const room = await Room.findOneAndUpdate(
+        { roomId },
+        { 
+          tmdbId, 
+          mediaType, 
+          title, 
+          posterPath, 
+          season, 
+          episode,
+          'playbackState.currentTime': 0,
+          'playbackState.isPlaying': true
+        },
+        { new: true }
+      );
+      if (room) {
+        io.to(`party:${roomId}`).emit('party-media-changed', room);
+      }
+    } catch (err) {
+      console.error('Failed to change media', err);
     }
   });
 

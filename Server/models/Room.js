@@ -22,6 +22,12 @@ const roomSchema = new mongoose.Schema({
     currentTime: { type: Number, default: 0 },
     updatedAt: { type: Date, default: Date.now }
   },
+  messages: [{
+    userId: String,
+    name: String,
+    text: String,
+    time: { type: Date, default: Date.now }
+  }],
   createdAt: { type: Date, default: Date.now },
   expiresAt: { type: Date, default: () => new Date(Date.now() + 24*60*60*1000) }  // 24h TTL
 });

@@ -41,11 +41,10 @@ router.post('/rooms', auth, async (req, res) => {
     // Send notifications to invited friends
     if (invitedFriendIds && invitedFriendIds.length > 0) {
       const notifications = invitedFriendIds.map(friendId => ({
-        recipient: friendId,
-        sender: req.user.id,
+        userId: friendId,
+        fromUser: req.user.id,
         type: 'party_invite',
-        content: `t'a invité à rejoindre une Watch Party pour ${title}`,
-        relatedId: roomId
+        data: { roomId, title }
       }));
       await Notification.insertMany(notifications);
       
