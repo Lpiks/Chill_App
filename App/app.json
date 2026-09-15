@@ -2,7 +2,7 @@
   "expo": {
     "name": "Chill",
     "slug": "chill",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/téléchargement (3).png",
     "scheme": "chill",
@@ -20,6 +20,7 @@
       "bundleIdentifier": "com.steppingstones.chill"
     },
     "android": {
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/téléchargement (3).png",
         "backgroundColor": "#ffffff"
