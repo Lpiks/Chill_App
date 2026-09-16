@@ -4,7 +4,7 @@
     "slug": "chill",
     "version": "1.0.2",
     "orientation": "portrait",
-    "icon": "./assets/téléchargement (3).png",
+    "icon": "./assets/app_logo.png",
     "scheme": "chill",
     "userInterfaceStyle": "dark",
     "splash": {
@@ -22,7 +22,7 @@
     "android": {
       "versionCode": 2,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/téléchargement (3).png",
+        "foregroundImage": "./assets/app_logo.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.steppingstones.chill",
