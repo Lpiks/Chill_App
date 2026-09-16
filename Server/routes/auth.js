@@ -7,7 +7,6 @@ const Otp = require('../models/Otp');
 
 // Register
 router.post('/register', async (req, res) => {
-  console.log('📝 Register Request received:', req.body);
   try {
     const { name, email, phone, password, method } = req.body;
     const normalizedEmail = email ? email.toLowerCase().trim() : undefined;
