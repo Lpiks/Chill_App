@@ -163,7 +163,7 @@ export default function WatchPartyRoom() {
   
   const isHost = getHostIdStr(room?.hostId) === user?.id;
 
-  // Initial Room Data
+
   const { data: roomDataRaw, isLoading } = useQuery({
     queryKey: ['party-room', roomId],
     queryFn: async () => {
@@ -377,7 +377,7 @@ export default function WatchPartyRoom() {
           style: 'destructive', 
           onPress: async () => {
             await api.delete(`/party/rooms/${roomId}`);
-            router.replace('/party');
+            router.navigate('/party');
           } 
         }
       ]
@@ -426,7 +426,7 @@ export default function WatchPartyRoom() {
               <Text style={styles.endBtnText}>Fin</Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity onPress={() => router.back()} style={styles.leaveBtn}>
+            <TouchableOpacity onPress={() => router.navigate('/party')} style={styles.leaveBtn}>
               <Text style={styles.leaveBtnText}>Quitter</Text>
             </TouchableOpacity>
           )}

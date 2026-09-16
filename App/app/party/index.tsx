@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,13 +27,19 @@ export default function WatchPartyHub() {
   const [roomCode, setRoomCode] = useState('');
   const [joining, setJoining] = useState(false);
 
-  const { data: recentRooms, isLoading } = useQuery({
+  const { data: recentRooms, isLoading, refetch } = useQuery({
     queryKey: ['party-recent'],
     queryFn: async () => {
       const res = await api.get('/party/recent');
       return res.data;
     }
   });
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const handleJoin = async () => {
     if (!roomCode || roomCode.length < 6) {

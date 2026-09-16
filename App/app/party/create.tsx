@@ -107,7 +107,7 @@ export default function CreatePartyScreen() {
       });
       
       queryClient.invalidateQueries({ queryKey: ['party-recent'] });
-      router.push(`/party/${res.data.roomId}`);
+      router.replace(`/party/${res.data.roomId}`);
     } catch (error) {
       PremiumAlert.alert('Erreur', 'Impossible de créer la salle.');
     }
