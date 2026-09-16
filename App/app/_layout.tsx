@@ -53,6 +53,21 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
   const [showFakeSplash, setShowFakeSplash] = useState(true);
+  const lastNotificationResponse = Notifications.useLastNotificationResponse();
+
+  useEffect(() => {
+    if (
+      lastNotificationResponse &&
+      lastNotificationResponse.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER
+    ) {
+      const data = lastNotificationResponse.notification.request.content.data;
+      if (data?.type === 'watch_party_invite' && data?.roomId) {
+        setTimeout(() => {
+          router.push(`/party/${data.roomId}`);
+        }, 500); // Give layout time to mount if cold boot
+      }
+    }
+  }, [lastNotificationResponse]);
 
   useEffect(() => {
     loadFromStorage();

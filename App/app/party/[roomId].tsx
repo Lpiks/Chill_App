@@ -12,7 +12,8 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
-  Keyboard
+  Keyboard,
+  Modal
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -136,8 +137,22 @@ export default function WatchPartyRoom() {
   
   const socketRef = useRef<Socket | null>(null);
   const peerRef = useRef<any>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
   const videoRef = useRef<any>(null);
   
+  const [showMembersModal, setShowMembersModal] = useState(false);
+
+  // Helper to generate a consistent color per user
+  const getColorForUser = (id: string) => {
+    if (!id) return '#ffffff';
+    const colors = ['#E50914', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
   const getHostIdStr = (hostId: any) => {
     if (!hostId) return null;
     if (typeof hostId === 'string') return hostId;
@@ -228,6 +243,7 @@ export default function WatchPartyRoom() {
           audio: true
         }) as MediaStream;
         setLocalStream(stream);
+        localStreamRef.current = stream;
         
         // Connect PeerJS
         // Uses the free public PeerJS cloud server (0.peerjs.com)
@@ -292,18 +308,25 @@ export default function WatchPartyRoom() {
     });
 
     socketRef.current.on('party-member-joined', ({ userId, peerId }) => {
-      if (localStream && peerRef.current) {
-        const call = peerRef.current.call(peerId, localStream);
+      // Use localStreamRef to avoid stale closure bugs!
+      const currentStream = localStreamRef.current;
+      if (currentStream && peerRef.current) {
+        const call = peerRef.current.call(peerId, currentStream);
         call.on('stream', (remStream) => {
           setRemoteStreams(prev => ({ ...prev, [userId]: remStream }));
         });
       }
     });
 
+    // Handle Socket Reconnections (e.g. after phone sleeps)
+    socketRef.current.on('connect', () => {
+      socketRef.current?.emit('party-join', { roomId, userId: user.id || (user as any)._id, peerId: peerRef.current?.id || null });
+    });
+
     return () => {
       socketRef.current?.disconnect();
       peerRef.current?.destroy();
-      localStream?.getTracks().forEach(t => t.stop());
+      localStreamRef.current?.getTracks().forEach(t => t.stop());
     };
   }, [roomId, user?.id]);
 
@@ -383,10 +406,13 @@ export default function WatchPartyRoom() {
           </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.roomTitle}>#{roomId}</Text>
-          <View style={styles.memberCount}>
+          <TouchableOpacity 
+            style={styles.memberCount} 
+            onPress={() => setShowMembersModal(true)}
+          >
             <Ionicons name="people" size={14} color={colors.muted} />
             <Text style={styles.memberText}>{room.members?.length || 1}/5</Text>
-          </View>
+          </TouchableOpacity>
         </View>
         
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -432,13 +458,13 @@ export default function WatchPartyRoom() {
             title={room.mediaType === 'tv' ? `${room.title} S${room.season} E${room.episode}` : room.title}
             isLocked={isLocked}
             isHost={isHost}
+            externalPlaybackState={playbackState}
             onPlayPause={(isPlaying, time) => {
-              socketRef.current?.emit(isPlaying ? 'party-play' : 'party-pause', { roomId, currentTime: time });
+              socketRef.current?.emit(isPlaying ? 'party-play' : 'party-pause', { roomId, currentTime: time, userId: user?.id || (user as any)._id });
             }}
             onSeek={(time) => {
-              socketRef.current?.emit('party-seek', { roomId, currentTime: time });
+              socketRef.current?.emit('party-seek', { roomId, currentTime: time, userId: user?.id || (user as any)._id });
             }}
-            externalPlaybackState={playbackState}
             onFullscreenChange={setIsPlayerFullscreen}
             onBack={() => {
               if (isHost) {
@@ -499,7 +525,7 @@ export default function WatchPartyRoom() {
                   keyExtractor={(_, index) => index.toString()}
                   renderItem={({ item }) => (
                     <View style={styles.fsMsgRow}>
-                      <Text style={styles.fsMsgName}>{item.name}</Text>
+                      <Text style={[styles.fsMsgName, { color: getColorForUser(item.userId) }]}>{item.name}</Text>
                       <Text style={styles.fsMsgText}>{item.text}</Text>
                     </View>
                   )}
@@ -550,9 +576,13 @@ export default function WatchPartyRoom() {
               <View style={styles.leftColumn}>
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.cameraGrid}>
                 {/* Local Feed */}
-                <View style={styles.thumbnailContainer}>
+                <View style={[styles.thumbnailContainer, { borderColor: getColorForUser(user?.id || (user as any)?._id), borderWidth: 2 }]}>
                   {localStream && cameraOn ? (
-                    <RTCView streamURL={localStream.toURL()} style={styles.thumbnail} objectFit="cover" />
+                    <RTCView 
+                      streamURL={localStream.toURL()} 
+                      style={styles.thumbnail} 
+                      objectFit="cover" 
+                    />
                   ) : (
                     <View style={[styles.thumbnail, styles.cameraOff]}>
                       <Text style={styles.avatarInitial}>{user?.name?.[0]?.toUpperCase()}</Text>
@@ -569,12 +599,11 @@ export default function WatchPartyRoom() {
                   </View>
                 </View>
 
-                {/* Remote Feeds */}
                 {Object.keys(remoteStreams).map(peerId => (
                   <View key={peerId} style={styles.thumbnailContainer}>
                     <RTCView 
                       streamURL={remoteStreams[peerId].toURL()} 
-                      style={styles.thumbnail} 
+                      style={[styles.thumbnail, { borderColor: getColorForUser(peerId), borderWidth: 2 }]} 
                       objectFit="cover" 
                     />
                   </View>
@@ -591,7 +620,7 @@ export default function WatchPartyRoom() {
                 renderItem={({ item }) => (
                   <View style={[styles.msgRow, item.userId === user?.id && styles.msgRowMine]}>
                     <View style={[styles.msgBubble, item.userId === user?.id && styles.msgBubbleMine]}>
-                      <Text style={styles.msgName}>{item.name}</Text>
+                      <Text style={[styles.msgName, { color: getColorForUser(item.userId) }]}>{item.name}</Text>
                       <Text style={styles.msgText}>{item.text}</Text>
                     </View>
                   </View>
@@ -639,6 +668,29 @@ export default function WatchPartyRoom() {
           setShowChangeMediaModal(false);
         }}
       />
+
+      {/* Members Modal */}
+      <Modal visible={showMembersModal} transparent animationType="fade">
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowMembersModal(false)}>
+          <View style={styles.membersModal}>
+            <Text style={styles.modalTitle}>Membres de la Party ({room?.members?.length || 1}/5)</Text>
+            {room?.members?.map((m: any, i: number) => {
+              const u = m.userId || {};
+              const idStr = getHostIdStr(u);
+              return (
+                <View key={i} style={styles.memberRow}>
+                  <View style={[styles.memberDot, { backgroundColor: getColorForUser(idStr) }]} />
+                  <Text style={styles.memberName}>{u.name || 'Invité'}</Text>
+                  {idStr === getHostIdStr(room.hostId) && (
+                    <Text style={styles.hostBadgeText}>(Hôte)</Text>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
     </KeyboardAvoidingView>
   );
 }
@@ -798,5 +850,49 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  membersModal: {
+    backgroundColor: '#1c1c1e',
+    borderRadius: 16,
+    padding: 20,
+    width: '80%',
+    maxWidth: 350,
+  },
+  modalTitle: {
+    fontFamily: 'BebasNeue_400Regular',
+    fontSize: 22,
+    color: 'white',
+    marginBottom: 15,
+    textAlign: 'center'
+  },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)'
+  },
+  memberDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 12
+  },
+  memberName: {
+    fontFamily: 'Nunito_400Regular',
+    fontSize: 16,
+    color: 'white',
+    flex: 1
+  },
+  hostBadgeText: {
+    fontFamily: 'Nunito_700Bold',
+    fontSize: 12,
+    color: colors.red
   }
 });

@@ -76,27 +76,30 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('party-play', async ({ roomId, currentTime }) => {
+  socket.on('party-play', async ({ roomId, currentTime, userId }) => {
     const room = await Room.findOne({ roomId });
     if (room) {
+      if (room.isLocked && room.hostId.toString() !== userId) return;
       room.playbackState = { isPlaying: true, currentTime, updatedAt: new Date() };
       await room.save();
       io.to(`party:${roomId}`).emit('party-play', { currentTime });
     }
   });
 
-  socket.on('party-pause', async ({ roomId, currentTime }) => {
+  socket.on('party-pause', async ({ roomId, currentTime, userId }) => {
     const room = await Room.findOne({ roomId });
     if (room) {
+      if (room.isLocked && room.hostId.toString() !== userId) return;
       room.playbackState = { isPlaying: false, currentTime, updatedAt: new Date() };
       await room.save();
       io.to(`party:${roomId}`).emit('party-pause', { currentTime });
     }
   });
 
-  socket.on('party-seek', async ({ roomId, currentTime }) => {
+  socket.on('party-seek', async ({ roomId, currentTime, userId }) => {
     const room = await Room.findOne({ roomId });
     if (room) {
+      if (room.isLocked && room.hostId.toString() !== userId) return;
       room.playbackState.currentTime = currentTime;
       room.playbackState.updatedAt = new Date();
       await room.save();

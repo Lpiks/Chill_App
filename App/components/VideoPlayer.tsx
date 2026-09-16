@@ -465,7 +465,7 @@ export const VideoPlayer = ({
   return (
     <View style={[styles.container, !isFullscreen && { aspectRatio: 16 / 9 }, isFullscreen && styles.fullscreenContainer]}>
       <StatusBar hidden={isFullscreen} />
-      <TouchableWithoutFeedback onPress={toggleControls} disabled={isLocked && !isHost}>
+      <TouchableWithoutFeedback onPress={toggleControls}>
         <View style={styles.videoWrapper}>
           <VideoView
             style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
@@ -482,7 +482,6 @@ export const VideoPlayer = ({
               onLongPress={startRewind}
               onPressOut={stopRewind}
               delayLongPress={300}
-              disabled={isLocked && !isHost}
             >
               <View style={{ flex: 1 }} />
             </TouchableWithoutFeedback>
@@ -492,7 +491,6 @@ export const VideoPlayer = ({
               onLongPress={startFastForward}
               onPressOut={stopFastForward}
               delayLongPress={300}
-              disabled={isLocked && !isHost}
             >
               <View style={{ flex: 1 }} />
             </TouchableWithoutFeedback>
