@@ -21,6 +21,8 @@ import api from '../../services/api';
 import { colors } from '../../constants/colors';
 import { Message, Conversation, User } from '../../types';
 import { useAuthStore } from '../../store/authStore';
+import { usePresenceStore } from '../../store/presenceStore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSocket } from '../../services/socket';
 import { useAudioRecorder, useAudioRecorderState, requestRecordingPermissionsAsync, RecordingPresets, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
@@ -90,6 +92,7 @@ export default function ChatScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuthStore();
+  const { isUserOnline } = usePresenceStore();
   const insets = useSafeAreaInsets();
   
   const [inputText, setInputText] = useState('');
@@ -637,8 +640,21 @@ export default function ChatScreen() {
           )}
           <View>
             <Text style={styles.name}>{title || 'Chargement...'}</Text>
-            <Text style={styles.status}>
-              {typingUsers.length > 0 ? 'En train d\'écrire...' : 'En ligne'}
+            <Text 
+              style={[
+                styles.status,
+                typingUsers.length > 0 
+                  ? { color: '#4CAF50' } 
+                  : (otherUser && isUserOnline((otherUser.id || otherUser._id)?.toString())
+                      ? { color: '#4CAF50' }
+                      : { color: colors.red })
+              ]}
+            >
+              {typingUsers.length > 0 
+                ? 'En train d\'écrire...' 
+                : (otherUser && isUserOnline((otherUser.id || otherUser._id)?.toString()) 
+                    ? 'En ligne' 
+                    : 'Hors ligne')}
             </Text>
           </View>
         </TouchableOpacity>

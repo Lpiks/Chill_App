@@ -38,6 +38,9 @@ const io = new Server(server, {
 // Pass io to app for use in routes
 app.set('io', io);
 
+// Global presence tracker
+const onlineUsers = new Map(); // Maps socket.id to userId
+
 // Socket.io logic
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
@@ -45,6 +48,14 @@ io.on('connection', (socket) => {
   // User-specific room for notifications
   socket.on('register', (userId) => {
     socket.join(`user:${userId}`);
+    socket.userId = userId;
+    onlineUsers.set(socket.id, userId);
+    io.emit('user-online', { userId });
+  });
+
+  socket.on('get-online-users', () => {
+    const usersArray = Array.from(new Set(onlineUsers.values()));
+    socket.emit('online-users-list', usersArray);
   });
 
   socket.on('join-conversations', (conversationIds) => {
@@ -188,7 +199,20 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log('User disconnected');
+    console.log('User disconnected:', socket.id);
+    if (socket.userId) {
+      onlineUsers.delete(socket.id);
+      
+      // Check if user has other active connections (e.g., multiple tabs or devices)
+      const isStillConnected = Array.from(onlineUsers.values()).includes(socket.userId);
+      if (!isStillConnected) {
+        io.emit('user-offline', { userId: socket.userId });
+        
+        // Update last seen in DB
+        const User = require('./models/User');
+        User.findByIdAndUpdate(socket.userId, { lastSeen: new Date() }).catch(err => console.error('Failed to update lastSeen', err));
+      }
+    }
   });
 });
 

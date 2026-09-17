@@ -18,10 +18,12 @@ import { Conversation } from '../../types';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useAuthStore } from '../../store/authStore';
+import { usePresenceStore } from '../../store/presenceStore';
 
 export default function DMListScreen() {
   const router = useRouter();
   const { user: currentUser } = useAuthStore();
+  const { isUserOnline } = usePresenceStore();
   const [search, setSearch] = useState('');
 
   const { data: conversations, isLoading, refetch } = useQuery({
@@ -74,10 +76,10 @@ export default function DMListScreen() {
               <Text style={styles.avatarText}>{name?.charAt(0)}</Text>
             </View>
           )}
-          {!isGroup && otherUser?.lastSeen && (
+          {!isGroup && otherUser && (
             <View style={[
               styles.onlineIndicator, 
-              { backgroundColor: (Date.now() - new Date(otherUser.lastSeen).getTime() < 300000) ? '#4CAF50' : '#757575' }
+              { backgroundColor: isUserOnline((otherUser.id || otherUser._id)?.toString()) ? '#4CAF50' : colors.red }
             ]} />
           )}
         </View>

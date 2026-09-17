@@ -8,6 +8,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/authStore';
+import { usePresenceStore } from '../store/presenceStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { Platform, StyleSheet } from 'react-native';
@@ -195,10 +196,29 @@ export default function RootLayout() {
       globalSocket.on('new-message', handleGlobalEvent);
       globalSocket.on('message-deleted', handleGlobalEvent);
 
+      // Presence Handlers
+      const { setOnlineUsers, addOnlineUser, removeOnlineUser } = usePresenceStore.getState();
+      
+      globalSocket.on('online-users-list', (users: string[]) => {
+        setOnlineUsers(users);
+      });
+      globalSocket.on('user-online', ({ userId }: { userId: string }) => {
+        addOnlineUser(userId);
+      });
+      globalSocket.on('user-offline', ({ userId }: { userId: string }) => {
+        removeOnlineUser(userId);
+      });
+
+      // Fetch initial list
+      globalSocket.emit('get-online-users');
+
       cleanupFn = () => {
         if (globalSocket) {
           globalSocket.off('new-message', handleGlobalEvent);
           globalSocket.off('message-deleted', handleGlobalEvent);
+          globalSocket.off('online-users-list');
+          globalSocket.off('user-online');
+          globalSocket.off('user-offline');
         }
       };
     };
