@@ -24,6 +24,7 @@ const adminRoutes = require('./routes/admin');
 
 const { updateTrending } = require('./utils/trendingJob');
 const Room = require('./models/Room');
+const Message = require('./models/Message');
 
 const app = express();
 const server = http.createServer(app);
@@ -175,6 +176,15 @@ io.on('connection', (socket) => {
 
   socket.on('stop-typing', ({ conversationId, userId }) => {
     socket.to(`conversation:${conversationId}`).emit('user-stop-typing', { userId });
+  });
+
+  socket.on('message-delivered', async ({ messageId, conversationId }) => {
+    try {
+      await Message.findByIdAndUpdate(messageId, { status: 'delivered' });
+      socket.to(`conversation:${conversationId}`).emit('message-status-updated', { messageId, status: 'delivered' });
+    } catch (err) {
+      console.error('Failed to update message status to delivered', err);
+    }
   });
 
   socket.on('disconnect', () => {

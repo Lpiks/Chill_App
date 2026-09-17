@@ -139,12 +139,13 @@ router.get('/:id/messages', auth, async (req, res) => {
 // POST /api/conversations/:id/messages
 router.post('/:id/messages', [auth, checkMessageLimit], async (req, res) => {
   try {
-    const { type, content, tmdbData, replyTo } = req.body;
+    const { type, content, tmdbData, replyTo, clientId } = req.body;
     const io = req.app.get('io');
 
     const message = new Message({
       conversationId: req.params.id,
       senderId: req.user.id,
+      clientId,
       type,
       content,
       tmdbData,
@@ -212,11 +213,12 @@ router.post('/:id/messages', [auth, checkMessageLimit], async (req, res) => {
 router.post('/:id/messages/voice', [auth, checkMessageLimit, upload.single('audio')], async (req, res) => {
   try {
     const io = req.app.get('io');
-    const { duration } = req.body;
+    const { duration, clientId } = req.body;
 
     const message = new Message({
       conversationId: req.params.id,
       senderId: req.user.id,
+      clientId,
       type: 'voice',
       mediaUrl: req.file.path,
       duration: parseInt(duration)

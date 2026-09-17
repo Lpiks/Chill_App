@@ -203,8 +203,28 @@ export default function ChatScreen() {
       if (message.conversationId === conversationId) {
         queryClient.setQueryData(['messages', conversationId], (old: any) => {
           if (!old) return old;
-          const exists = old.pages.some((page: any[]) => page.some(m => m._id === message._id));
-          if (exists) return old;
+          
+          let replaced = false;
+          const newPages = old.pages.map((page: any, pageIdx: number) => {
+            if (pageIdx !== 0) return page;
+            
+            // Check if we already have the real message
+            if (page.some((m: any) => m._id === message._id)) {
+              replaced = true; 
+              return page;
+            }
+
+            // Check if we have the optimistic message matching the clientId
+            if ((message as any).clientId && page.some((m: any) => m._id === (message as any).clientId)) {
+              replaced = true;
+              return page.map((m: any) => m._id === (message as any).clientId ? message : m);
+            }
+            return page;
+          });
+
+          if (replaced) {
+            return { ...old, pages: newPages };
+          }
 
           return {
             ...old,
@@ -212,8 +232,47 @@ export default function ChatScreen() {
           };
         });
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        
+        // Emit delivered event if not my message
+        const isMe = ((message.senderId as any)._id || (message.senderId as any).id || message.senderId) === currentUser?.id;
+        if (!isMe && socket) {
+          socket.emit('message-delivered', { messageId: message._id, conversationId });
+        }
+        
         // Mark as read if user is active
         api.put(`/conversations/${conversationId}/read`);
+      }
+    };
+
+    const handleMessageStatusUpdated = ({ messageId, status }: { messageId: string, status: string }) => {
+      queryClient.setQueryData(['messages', conversationId], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => 
+            page.map((m: any) => 
+              m._id === messageId ? { ...m, status } : m
+            )
+          )
+        };
+      });
+    };
+
+    const handleMessagesSeen = ({ conversationId: cId, userId }: { conversationId: string, userId: string }) => {
+      if (userId !== currentUser?.id) {
+        queryClient.setQueryData(['messages', conversationId], (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page: any) => 
+              page.map((m: any) => 
+                (((m.senderId as any)._id || (m.senderId as any).id || m.senderId) === currentUser?.id && m.status !== 'seen')
+                  ? { ...m, status: 'seen' } 
+                  : m
+              )
+            )
+          };
+        });
       }
     };
 
@@ -256,6 +315,8 @@ export default function ChatScreen() {
       socket.emit('join-conversations', [conversationId]);
 
       socket.on('new-message', handleNewMessage);
+      socket.on('message-status-updated', handleMessageStatusUpdated);
+      socket.on('messages-seen', handleMessagesSeen);
       socket.on('message-reaction', handleMessageReaction);
       socket.on('message-deleted', handleMessageDeleted);
       socket.on('user-typing', handleUserTyping);
@@ -268,6 +329,8 @@ export default function ChatScreen() {
     return () => {
       if (socket) {
         socket.off('new-message', handleNewMessage);
+        socket.off('message-status-updated', handleMessageStatusUpdated);
+        socket.off('messages-seen', handleMessagesSeen);
         socket.off('message-reaction', handleMessageReaction);
         socket.off('message-deleted', handleMessageDeleted);
         socket.off('user-typing', handleUserTyping);
@@ -312,7 +375,8 @@ export default function ChatScreen() {
       const res = await api.post(`/conversations/${conversationId}/messages`, {
         type: 'text',
         content: text,
-        replyTo: replyingTo?._id
+        replyTo: replyingTo?._id,
+        clientId: optimisticId
       });
       queryClient.setQueryData(['messages', conversationId], (old: any) => {
         if (!old) return old;
@@ -423,6 +487,7 @@ export default function ChatScreen() {
         name: 'voice.m4a'
       } as any);
       formData.append('duration', duration.toString());
+      formData.append('clientId', optimisticId);
 
       const res = await api.post(`/conversations/${conversationId}/messages/voice`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
@@ -527,7 +592,7 @@ export default function ChatScreen() {
             <Text style={styles.msgTime}>{format(new Date(item.createdAt), 'HH:mm')}</Text>
             {isMe && (
               <Ionicons 
-                name={item.status === 'seen' ? 'checkmark-done' : 'checkmark'} 
+                name={item.status === 'seen' || item.status === 'delivered' ? 'checkmark-done' : 'checkmark'} 
                 size={14} 
                 color={item.status === 'seen' ? colors.red : '#757575'} 
                 style={{ marginLeft: 5 }}
