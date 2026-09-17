@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -22,13 +22,68 @@ import { colors } from '../../constants/colors';
 import { Message, Conversation, User } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import { getSocket } from '../../services/socket';
-import { useAudioRecorder, requestRecordingPermissionsAsync, RecordingPresets } from 'expo-audio';
+import { useAudioRecorder, useAudioRecorderState, requestRecordingPermissionsAsync, RecordingPresets, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { io, Socket } from 'socket.io-client';
 import { PremiumAlert } from '../../utils/PremiumAlert';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+
+const AudioMessageBubble = ({ url, duration }: { url: string, duration?: number }) => {
+  const player = useAudioPlayer(url);
+  const status = useAudioPlayerStatus(player);
+  const isPlaying = status.playing;
+
+  const handlePlayPause = () => {
+    if (isPlaying) {
+      player.pause();
+    } else {
+      player.play();
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const formatTime = (millis: number) => {
+    const totalSeconds = Math.floor(millis / 1000);
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  const waveData = useMemo(() => [12, 8, 15, 20, 10, 18, 14, 22, 16, 12, 8, 19, 24, 15, 10, 14, 21, 18, 12, 16, 20, 15, 10, 22, 18, 14, 12, 19, 15, 10], []);
+
+  const totalDuration = status.duration || duration || 1;
+  const progress = status.currentTime / totalDuration;
+
+  return (
+    <View style={styles.audioBubble}>
+      <TouchableOpacity onPress={handlePlayPause} style={styles.audioPlayBtn}>
+        <Ionicons name={isPlaying ? "pause" : "play"} size={20} color="white" />
+      </TouchableOpacity>
+      <View style={styles.audioWaveform}>
+        {waveData.map((val, i) => {
+          const isFilled = (i / waveData.length) <= progress;
+          return (
+            <View 
+              key={i} 
+              style={[
+                styles.audioWaveBar, 
+                { 
+                  height: val, 
+                  backgroundColor: isFilled ? 'white' : 'rgba(255,255,255,0.3)' 
+                }
+              ]} 
+            />
+          );
+        })}
+      </View>
+      <Text style={styles.audioTime}>
+        {isPlaying ? formatTime(status.currentTime * 1000) : (duration ? formatTime(duration * 1000) : '0:00')}
+      </Text>
+    </View>
+  );
+};
 
 export default function ChatScreen() {
   const { conversationId } = useLocalSearchParams();
@@ -40,10 +95,18 @@ export default function ChatScreen() {
   const [inputText, setInputText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(audioRecorder, 100);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const finalDurationRef = useRef<number>(0);
+  useEffect(() => {
+    if (recorderState.durationMillis > 0) {
+      finalDurationRef.current = recorderState.durationMillis;
+    }
+  }, [recorderState.durationMillis]);
   
   const flashListRef = useRef<any>(null);
 
@@ -138,10 +201,16 @@ export default function ChatScreen() {
 
     const handleNewMessage = (message: Message) => {
       if (message.conversationId === conversationId) {
-        queryClient.setQueryData(['messages', conversationId], (old: any) => ({
-          ...old,
-          pages: [[message, ...old.pages[0]], ...old.pages.slice(1)]
-        }));
+        queryClient.setQueryData(['messages', conversationId], (old: any) => {
+          if (!old) return old;
+          const exists = old.pages.some((page: any[]) => page.some(m => m._id === message._id));
+          if (exists) return old;
+
+          return {
+            ...old,
+            pages: [[message, ...old.pages[0]], ...old.pages.slice(1)]
+          };
+        });
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         // Mark as read if user is active
         api.put(`/conversations/${conversationId}/read`);
@@ -213,17 +282,60 @@ export default function ChatScreen() {
     setInputText('');
     stopTyping();
 
+    const optimisticId = Date.now().toString();
+    const optimisticMessage = {
+      _id: optimisticId,
+      senderId: currentUser,
+      type: 'text',
+      content: text,
+      replyTo: replyingTo,
+      status: 'sending',
+      createdAt: new Date().toISOString()
+    };
+
+    queryClient.setQueryData(['messages', conversationId], (old: any) => {
+      if (!old) return old;
+      return {
+        ...old,
+        pages: [[optimisticMessage, ...old.pages[0]], ...old.pages.slice(1)]
+      };
+    });
+    setReplyingTo(null);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // Scroll to bottom immediately
+    setTimeout(() => {
+      flashListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    }, 100);
+
     try {
-      await api.post(`/conversations/${conversationId}/messages`, {
+      const res = await api.post(`/conversations/${conversationId}/messages`, {
         type: 'text',
         content: text,
         replyTo: replyingTo?._id
       });
-      setReplyingTo(null);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      queryClient.setQueryData(['messages', conversationId], (old: any) => {
+        if (!old) return old;
+        const alreadyAdded = old.pages.some((page: any[]) => page.some(m => m._id === res.data._id));
+        return {
+          ...old,
+          pages: old.pages.map((page: any, pageIdx: number) => {
+            if (pageIdx !== 0) return page;
+            if (alreadyAdded) return page.filter((m: any) => m._id !== optimisticId);
+            return page.map((m: any) => m._id === optimisticId ? res.data : m);
+          })
+        };
+      });
     } catch (error: any) {
-      console.error('Error fetching messages:', error);
-      PremiumAlert.alert('Erreur', error.response?.data?.message || 'Erreur lors du chargement des messages');
+      console.error('Error sending message:', error);
+      queryClient.setQueryData(['messages', conversationId], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => page.filter((m: any) => m._id !== optimisticId))
+        };
+      });
+      PremiumAlert.alert('Erreur', error.response?.data?.message || 'Erreur lors de l\'envoi du message');
     }
   };
 
@@ -244,36 +356,103 @@ export default function ChatScreen() {
 
   const startRecording = async () => {
     try {
-      const { status } = await requestRecordingPermissionsAsync();
-      if (status !== 'granted') return;
-      
-      await audioRecorder.record();
-      setIsRecording(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const permission = await requestRecordingPermissionsAsync();
+      if (permission.status === 'granted') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setIsRecording(true);
+        await audioRecorder.prepareToRecordAsync();
+        audioRecorder.record();
+      } else {
+        PremiumAlert.alert('Erreur', 'Permission microphone refusée.');
+      }
     } catch (err) {
       console.error('Failed to start recording', err);
     }
   };
 
-  const stopRecording = async () => {
-    setIsRecording(false);
-    await audioRecorder.stop();
-    const uri = audioRecorder.uri;
-    const duration = 0; // In a real app, calculate duration
-
-    if (uri) {
-      const formData = new FormData();
-      // @ts-ignore
-      formData.append('audio', { uri, type: 'audio/m4a', name: 'voice.m4a' });
-      formData.append('duration', '10'); // Mock duration
-
-      try {
-        await api.post(`/conversations/${conversationId}/messages/voice`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-      } catch (e) {}
+  const cancelRecording = async () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await audioRecorder.stop();
+      setIsRecording(false);
+    } catch (err) {
+      console.error('Failed to cancel recording', err);
     }
   };
+
+  const stopAndSendRecording = async () => {
+    try {
+      setIsRecording(false);
+      await audioRecorder.stop();
+      const uri = audioRecorder.uri;
+      const duration = Math.floor(finalDurationRef.current / 1000) || 1;
+      
+      if (!uri) {
+        PremiumAlert.alert('Erreur', 'L\'enregistrement n\'a pas généré de fichier audio.');
+        return;
+      }
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      // Optimistic Audio Message
+      const optimisticId = Date.now().toString();
+      const optimisticMessage = {
+        _id: optimisticId,
+        senderId: currentUser,
+        type: 'voice',
+        mediaUrl: uri,
+        duration: duration,
+        status: 'sending',
+        createdAt: new Date().toISOString()
+      };
+
+      queryClient.setQueryData(['messages', conversationId], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: [[optimisticMessage, ...old.pages[0]], ...old.pages.slice(1)]
+        };
+      });
+
+      const fileUri = Platform.OS === 'ios' ? uri.replace('file://', '') : (uri.startsWith('file://') ? uri : `file://${uri}`);
+
+      const formData = new FormData();
+      formData.append('audio', {
+        uri: fileUri,
+        type: 'audio/m4a',
+        name: 'voice.m4a'
+      } as any);
+      formData.append('duration', duration.toString());
+
+      const res = await api.post(`/conversations/${conversationId}/messages/voice`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      queryClient.setQueryData(['messages', conversationId], (old: any) => {
+        if (!old) return old;
+        const alreadyAdded = old.pages.some((page: any[]) => page.some(m => m._id === res.data._id));
+        return {
+          ...old,
+          pages: old.pages.map((page: any, pageIdx: number) => {
+            if (pageIdx !== 0) return page;
+            if (alreadyAdded) return page.filter((m: any) => m._id !== optimisticId);
+            return page.map((m: any) => m._id === optimisticId ? res.data : m);
+          })
+        };
+      });
+
+    } catch (err) {
+      console.error('Failed to stop and send recording', err);
+      PremiumAlert.alert('Erreur', 'Impossible d\'envoyer le message vocal.');
+    }
+  };
+
+  useEffect(() => {
+    if (isRecording && recorderState.durationMillis >= 30000 && recorderState.isRecording) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      audioRecorder.stop();
+    }
+  }, [isRecording, recorderState.durationMillis, recorderState.isRecording]);
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isMe = ((item.senderId as any)._id || (item.senderId as any).id || item.senderId) === currentUser?.id;
@@ -306,11 +485,7 @@ export default function ChatScreen() {
             <Text style={styles.messageText}>{item.content}</Text>
           )}
           {item.type === 'voice' && (
-            <View style={styles.voiceBubble}>
-              <Ionicons name="play" size={24} color="white" />
-              <View style={styles.waveformPlaceholder} />
-              <Text style={styles.duration}>0:10</Text>
-            </View>
+            <AudioMessageBubble url={(item as any).mediaUrl || item.content} duration={(item as any).duration} />
           )}
           {(item.type as any) === 'media' && item.tmdbData && (
             <View style={styles.mediaCard}>
@@ -436,37 +611,56 @@ export default function ChatScreen() {
             </TouchableOpacity>
           </View>
         )}
+        
         <View style={[
           styles.inputBar, 
           { paddingBottom: keyboardVisible ? 10 : Math.max(insets.bottom, 10) }
         ]}>
-          <TouchableOpacity style={styles.attachBtn}>
-            <Ionicons name="add" size={28} color="white" />
-          </TouchableOpacity>
+          {isRecording ? (
+            <View style={styles.recordingContainer}>
+              <TouchableOpacity style={styles.cancelRecBtn} onPress={cancelRecording}>
+                <Ionicons name="trash-outline" size={24} color={colors.red} />
+              </TouchableOpacity>
+              
+              <View style={styles.recordingCenter}>
+                <View style={[styles.recDot, !recorderState.isRecording && { backgroundColor: colors.muted }]} />
+                <Text style={styles.recTime}>
+                  {Math.floor(recorderState.durationMillis / 1000)}s
+                </Text>
+              </View>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Message..."
-            placeholderTextColor="#757575"
-            multiline
-            value={inputText}
-            onChangeText={(t) => {
-              setInputText(t);
-              startTyping();
-            }}
-          />
-
-          {inputText.trim() ? (
-            <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
-              <Ionicons name="send" size={24} color="white" />
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.sendRecBtn} onPress={stopAndSendRecording}>
+                <Ionicons name="send" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
           ) : (
-            <TouchableOpacity 
-              style={styles.micBtn}
-              onPress={() => PremiumAlert.alert('Info', 'Les messages vocaux seront disponibles demain !')}
-            >
-              <Ionicons name="mic-outline" size={26} color="white" />
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity style={styles.attachBtn}>
+                <Ionicons name="add" size={28} color="white" />
+              </TouchableOpacity>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Message..."
+                placeholderTextColor="#757575"
+                multiline
+                value={inputText}
+                onChangeText={(t) => {
+                  setInputText(t);
+                  startTyping();
+                }}
+              />
+
+              {inputText.trim() ? (
+                <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
+                  <Ionicons name="send" size={24} color="white" />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.micBtn} onPress={startRecording}>
+                  <Ionicons name="mic-outline" size={26} color="white" />
+                </TouchableOpacity>
+              )}
+            </>
           )}
         </View>
       </KeyboardAvoidingView>
@@ -561,8 +755,19 @@ const styles = StyleSheet.create({
   actionText: { color: 'white', fontSize: 16, marginLeft: 15, fontWeight: '600' },
   
   replyingBar: { flexDirection: 'row', backgroundColor: '#111', padding: 10, alignItems: 'center', borderTopWidth: 1, borderTopColor: '#333' },
-  replyingName: { color: colors.red, fontSize: 14, fontWeight: 'bold' },
-  replyingText: { color: '#aaa', fontSize: 13, marginTop: 2 },
+  replyingName: { color: colors.red, fontSize: 12, fontWeight: 'bold' },
+  replyingText: { color: 'white', fontSize: 14, marginTop: 2 },
+  audioBubble: { flexDirection: 'row', alignItems: 'center', padding: 5 },
+  audioPlayBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.red, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
+  audioWaveform: { flexShrink: 1, flexDirection: 'row', alignItems: 'center', height: 30, gap: 3, overflow: 'hidden' },
+  audioWaveBar: { width: 3, backgroundColor: 'rgba(255,255,255,0.4)', borderRadius: 2 },
+  audioTime: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginLeft: 10, minWidth: 30 },
+  recordingContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, height: 40 },
+  recordingCenter: { flexDirection: 'row', alignItems: 'center' },
+  recDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.red, marginRight: 8 },
+  recTime: { color: 'white', fontSize: 16, fontWeight: 'bold', fontFamily: 'Nunito_700Bold' },
+  cancelRecBtn: { padding: 10 },
+  sendRecBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.red, justifyContent: 'center', alignItems: 'center' },
   bubbleFooter: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 4 },
   msgTime: { fontSize: 10, color: 'rgba(255,255,255,0.6)' },
   inputBar: { 
