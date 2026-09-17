@@ -29,6 +29,7 @@ import Animated, {
   withTiming, 
   withSequence,
   withDelay,
+  withRepeat,
   Easing,
   runOnJS
 } from 'react-native-reanimated';
@@ -141,6 +142,26 @@ export default function WatchPartyRoom() {
   const videoRef = useRef<any>(null);
   
   const [showMembersModal, setShowMembersModal] = useState(false);
+  const isClosingRef = useRef(false);
+
+  // Pulse animation for mic activity using Reanimated
+  const pulseScale = useSharedValue(1);
+  const pulseOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (micOn) {
+      pulseScale.value = withRepeat(withTiming(1.25, { duration: 800 }), -1, true);
+      pulseOpacity.value = withRepeat(withTiming(0.5, { duration: 800 }), -1, true);
+    } else {
+      pulseScale.value = withTiming(1, { duration: 300 });
+      pulseOpacity.value = withTiming(0, { duration: 300 });
+    }
+  }, [micOn]);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseScale.value }],
+    opacity: pulseOpacity.value
+  }));
 
   // Helper to generate a consistent color per user
   const getColorForUser = (id: string) => {
@@ -303,8 +324,16 @@ export default function WatchPartyRoom() {
     });
 
     socketRef.current.on('party-ended', () => {
-      PremiumAlert.alert('Fin de la Party', 'L\'hôte a terminé la salle.');
-      router.replace('/party');
+      if (isClosingRef.current) return;
+      isClosingRef.current = true;
+      if (!isHost) {
+        PremiumAlert.alert('Fin de la Party', 'L\'hôte a terminé la salle.');
+      }
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/party');
+      }
     });
 
     socketRef.current.on('party-member-joined', ({ userId, peerId }) => {
@@ -376,8 +405,14 @@ export default function WatchPartyRoom() {
           text: 'Terminer', 
           style: 'destructive', 
           onPress: async () => {
+            if (isClosingRef.current) return;
+            isClosingRef.current = true;
             await api.delete(`/party/rooms/${roomId}`);
-            router.navigate('/party');
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/party');
+            }
           } 
         }
       ]
@@ -576,7 +611,20 @@ export default function WatchPartyRoom() {
               <View style={styles.leftColumn}>
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.cameraGrid}>
                 {/* Local Feed */}
-                <View style={[styles.thumbnailContainer, { borderColor: getColorForUser(user?.id || (user as any)?._id), borderWidth: 2 }]}>
+                <View style={{ position: 'relative', marginVertical: 4 }}>
+                  {micOn && (
+                    <Animated.View 
+                      style={[
+                        StyleSheet.absoluteFill, 
+                        { 
+                          backgroundColor: getColorForUser(user?.id || (user as any)?._id),
+                          borderRadius: 12
+                        },
+                        pulseStyle
+                      ]} 
+                    />
+                  )}
+                  <View style={[styles.thumbnailContainer, { borderColor: getColorForUser(user?.id || (user as any)?._id), borderWidth: 2 }]}>
                   {localStream && cameraOn ? (
                     <RTCView 
                       streamURL={localStream.toURL()} 
@@ -585,7 +633,11 @@ export default function WatchPartyRoom() {
                     />
                   ) : (
                     <View style={[styles.thumbnail, styles.cameraOff]}>
-                      <Text style={styles.avatarInitial}>{user?.name?.[0]?.toUpperCase()}</Text>
+                      {user?.avatar ? (
+                        <Image source={{ uri: user.avatar }} style={{ width: '100%', height: '100%', borderRadius: 10 }} contentFit="cover" />
+                      ) : (
+                        <Text style={styles.avatarInitial}>{user?.name?.[0]?.toUpperCase()}</Text>
+                      )}
                     </View>
                   )}
                   <View style={styles.hostBadge}><Text style={styles.hostText}>VOUS</Text></View>
@@ -597,6 +649,7 @@ export default function WatchPartyRoom() {
                       <Ionicons name={cameraOn ? "videocam" : "videocam-off"} size={12} color="white" />
                     </TouchableOpacity>
                   </View>
+                </View>
                 </View>
 
                 {Object.keys(remoteStreams).map(peerId => (
